@@ -1,0 +1,153 @@
+{% extends 'diary/base.html' %}
+
+{% block title %}Аналитика настроения{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">📈 Аналитика вашего настроения</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Анализ основан на {{ positive_correlations.count|add:negative_correlations.count }} выявленных корреляциях</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Позитивные триггеры -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-success bg-opacity-10">
+                <h5 class="mb-0">👍 Что вас радует</h5>
+            </div>
+            <div class="card-body">
+                {% if positive_correlations %}
+                    <div class="list-group">
+                        {% for correlation in positive_correlations %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ correlation.keyword.word }}</strong>
+                                <small class="text-muted d-block">{{ correlation.keyword.get_category_display }}</small>
+                                <small>Упоминаний: {{ correlation.occurrence_count }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success rounded-pill fs-6">
+                                    +{{ correlation.correlation_score|floatformat:2 }}
+                                </span>
+                                <div class="mt-1">
+                                    <small class="text-muted">{{ correlation.get_correlation_label }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="display-6 mb-3">📊</div>
+                        <p class="text-muted">Недостаточно данных для анализа позитивных триггеров</p>
+                        <small>Создайте больше записей для выявления закономерностей</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Негативные триггеры -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-danger bg-opacity-10">
+                <h5 class="mb-0">👎 Что вас огорчает</h5>
+            </div>
+            <div class="card-body">
+                {% if negative_correlations %}
+                    <div class="list-group">
+                        {% for correlation in negative_correlations %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ correlation.keyword.word }}</strong>
+                                <small class="text-muted d-block">{{ correlation.keyword.get_category_display }}</small>
+                                <small>Упоминаний: {{ correlation.occurrence_count }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-danger rounded-pill fs-6">
+                                    {{ correlation.correlation_score|floatformat:2 }}
+                                </span>
+                                <div class="mt-1">
+                                    <small class="text-muted">{{ correlation.get_correlation_label }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="display-6 mb-3">📉</div>
+                        <p class="text-muted">Недостаточно данных для анализа негативных триггеров</p>
+                        <small>Создайте больше записей для выявления закономерностей</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- График по дням недели -->
+{% if day_chart_html %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📅 Настроение по дням недели</h5>
+            </div>
+            <div class="card-body">
+                <div id="day-chart">
+                    {{ day_chart_html|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Советы -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">💡 Рекомендации на основе анализа</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card border-success mb-3">
+                            <div class="card-body">
+                                <h6>Увеличивайте позитивные факторы:</h6>
+                                <ul class="mb-0">
+                                    <li>Чаще планируйте занятия, связанные с вашими позитивными триггерами</li>
+                                    <li>Обращайте внимание на моменты, когда чувствуете себя хорошо</li>
+                                    <li>Записывайте успехи и приятные события</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-danger mb-3">
+                            <div class="card-body">
+                                <h6>Уменьшайте негативные факторы:</h6>
+                                <ul class="mb-0">
+                                    <li>Планируйте способы избегания или смягчения негативных триггеров</li>
+                                    <li>Разрабатывайте стратегии coping с неприятными ситуациями</li>
+                                    <li>Обращайтесь за поддержкой при необходимости</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

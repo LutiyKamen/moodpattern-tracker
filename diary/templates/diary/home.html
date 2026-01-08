@@ -1,0 +1,98 @@
+{% extends 'diary/base.html' %}
+
+{% block title %}Главная - MoodPattern Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <!-- Герой-секция -->
+        <div class="card text-center">
+            <div class="card-body py-5">
+                <h1 class="display-4 mb-4">📝 MoodPattern Tracker</h1>
+                <p class="lead mb-4">Анализируйте своё настроение, находите триггеры и улучшайте эмоциональное состояние</p>
+
+                {% if not user.is_authenticated %}
+                <div class="mt-4">
+                    <a href="{% url 'register' %}" class="btn btn-primary btn-lg me-3">Начать бесплатно</a>
+                    <a href="{% url 'login' %}" class="btn btn-outline-primary btn-lg">Войти</a>
+                </div>
+                {% else %}
+                <div class="mt-4">
+                    <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg">Перейти в личный кабинет</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Преимущества -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 mb-3">📊</div>
+                        <h5 class="card-title">Анализ настроения</h5>
+                        <p class="card-text">Автоматический анализ тональности ваших записей с помощью NLP</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 mb-3">🔍</div>
+                        <h5 class="card-title">Поиск триггеров</h5>
+                        <p class="card-text">Выявление факторов, которые влияют на ваше эмоциональное состояние</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 mb-3">📈</div>
+                        <h5 class="card-title">Визуализация</h5>
+                        <p class="card-text">Графики и статистика для наглядного отслеживания динамики</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Демо-статистика -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="mb-0">Пример аналитики</h4>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h3>{{ demo_data.total_entries|default:"1250" }}</h3>
+                        <p class="text-muted">всего записей</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3 class="mood-positive">+{{ demo_data.avg_mood|default:"0.35" }}</h3>
+                        <p class="text-muted">среднее настроение</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3>{{ demo_data.top_triggers|length|default:"3" }}</h3>
+                        <p class="text-muted">основных триггера</p>
+                    </div>
+                </div>
+
+                {% if demo_data.top_triggers %}
+                <div class="mt-4">
+                    <h5>Топ-триггеры:</h5>
+                    <div class="list-group">
+                        {% for trigger in demo_data.top_triggers %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ trigger.word }}
+                            <span class="badge {% if trigger.correlation > 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                                {{ trigger.correlation|floatformat:2 }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends 'diary/base.html' %}
+
+{% block title %}Личный кабинет{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Левая колонка - статистика -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📊 Моя статистика</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="display-6 {% if avg_mood > 0.3 %}mood-positive{% elif avg_mood < -0.3 %}mood-negative{% else %}mood-neutral{% endif %}">
+                        {{ avg_mood|floatformat:2 }}
+                    </div>
+                    <p class="text-muted">Среднее настроение</p>
+                </div>
+
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        Всего записей
+                        <span class="badge bg-primary rounded-pill">{{ total_entries }}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>📝 <a href="{% url 'create_entry' %}" class="text-decoration-none">Новая запись</a></span>
+                        <span class="text-muted">+</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>📈 <a href="{% url 'analytics' %}" class="text-decoration-none">Подробная аналитика</a></span>
+                        <span class="text-muted">→</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Топ-триггеры -->
+        {% if top_correlations %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">🔍 Ваши основные триггеры</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for correlation in top_correlations %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ correlation.keyword.word }}</strong>
+                            <small class="text-muted d-block">{{ correlation.keyword.get_category_display }}</small>
+                        </div>
+                        <span class="badge {% if correlation.correlation_score > 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                            {{ correlation.correlation_score|floatformat:2 }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Правая колонка - записи и график -->
+    <div class="col-lg-8">
+        <!-- График настроения -->
+        {% if mood_chart_html %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📈 Динамика настроения</h5>
+            </div>
+            <div class="card-body">
+                <div id="mood-chart">
+                    {{ mood_chart_html|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Последние записи -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">📝 Последние записи</h5>
+                <a href="{% url 'create_entry' %}" class="btn btn-primary btn-sm">+ Новая запись</a>
+            </div>
+            <div class="card-body">
+                {% if page_obj %}
+                    {% for entry in page_obj %}
+                    <div class="card mb-3 {% if forloop.first %}border-primary{% endif %}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h6 class="card-title mb-1">
+                                        {{ entry.date_created|date:"d.m.Y H:i" }}
+                                        <span class="badge {% if entry.mood_score > 0.3 %}bg-success{% elif entry.mood_score < -0.3 %}bg-danger{% else %}bg-secondary{% endif %} ms-2">
+                                            {{ entry.get_user_mood_tag_display }}
+                                        </span>
+                                    </h6>
+                                    {% if entry.mood_score is not None %}
+                                    <small class="text-muted">
+                                        Оценка настроения:
+                                        <span class="{% if entry.mood_score > 0.3 %}mood-positive{% elif entry.mood_score < -0.3 %}mood-negative{% else %}mood-neutral{% endif %}">
+                                            {{ entry.mood_score|floatformat:2 }}
+                                        </span>
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        Действия
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{% url 'edit_entry' entry.id %}">✏️ Редактировать</a></li>
+                                        <li><a class="dropdown-item text-danger" href="{% url 'delete_entry' entry.id %}">🗑️ Удалить</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <p class="card-text">{{ entry.text|truncatewords:50 }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">{{ entry.word_count }} слов</small>
+                                <a href="{% url 'edit_entry' entry.id %}" class="btn btn-outline-primary btn-sm">Читать полностью</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Пагинация -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="Навигация по страницам">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Назад</a>
+                            </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперед</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                {% else %}
+                <div class="text-center py-5">
+                    <div class="display-6 mb-3">📝</div>
+                    <h5>У вас пока нет записей</h5>
+                    <p class="text-muted">Создайте первую запись, чтобы начать отслеживать настроение</p>
+                    <a href="{% url 'create_entry' %}" class="btn btn-primary">Создать первую запись</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

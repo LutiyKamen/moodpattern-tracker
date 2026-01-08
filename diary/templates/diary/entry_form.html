@@ -1,0 +1,114 @@
+{% extends 'diary/base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">{{ title }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <!-- Поле текста -->
+                    <div class="mb-4">
+                        <label for="{{ form.text.id_for_label }}" class="form-label">{{ form.text.label }}</label>
+                        {{ form.text }}
+                        {% if form.text.help_text %}
+                        <div class="form-text">{{ form.text.help_text }}</div>
+                        {% endif %}
+                        {% if form.text.errors %}
+                        <div class="alert alert-danger mt-2">
+                            {{ form.text.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Поле настроения -->
+                    <div class="mb-4">
+                        <label for="{{ form.user_mood_tag.id_for_label }}" class="form-label">{{ form.user_mood_tag.label }}</label>
+                        {{ form.user_mood_tag }}
+                        {% if form.user_mood_tag.errors %}
+                        <div class="alert alert-danger mt-2">
+                            {{ form.user_mood_tag.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Подсказки по настроению -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h6>🎯 Подсказка для метки настроения:</h6>
+                            <div class="row">
+                                <div class="col">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-success me-2">Отличное</span>
+                                        <small>Ощущение счастья, энтузиазма</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-info me-2">Хорошее</span>
+                                        <small>Удовлетворение, спокойствие</small>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-secondary me-2">Нейтральное</span>
+                                        <small>Без особых эмоций</small>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-warning me-2">Плохое</span>
+                                        <small>Раздражение, грусть</small>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-danger me-2">Ужасное</span>
+                                        <small>Сильный стресс, подавленность</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">Отмена</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if title == 'Новая запись' %}Добавить запись{% else %}Сохранить изменения{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Подсчет слов в реальном времени
+document.getElementById('{{ form.text.id_for_label }}').addEventListener('input', function() {
+    const text = this.value;
+    const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+    const counter = document.getElementById('word-counter');
+
+    if (!counter) {
+        // Создаем счетчик если его нет
+        const counterElement = document.createElement('div');
+        counterElement.id = 'word-counter';
+        counterElement.className = 'form-text mt-1';
+        this.parentNode.appendChild(counterElement);
+    }
+
+    document.getElementById('word-counter').textContent =
+        `Слов: ${wordCount} (минимум 10)`;
+
+    // Подсветка если мало слов
+    if (wordCount < 10) {
+        document.getElementById('word-counter').style.color = '#dc3545';
+    } else {
+        document.getElementById('word-counter').style.color = '#198754';
+    }
+});
+</script>
+{% endblock %}

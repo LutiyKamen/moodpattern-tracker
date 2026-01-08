@@ -1,0 +1,43 @@
+{% extends 'diary/base.html' %}
+
+{% block title %}Удаление записи{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">🗑️ Удаление записи</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h5>Вы уверены, что хотите удалить эту запись?</h5>
+                    <p class="mb-0">Это действие нельзя отменить. Вся аналитика, связанная с этой записью, будет обновлена.</p>
+                </div>
+
+                <!-- Предпросмотр записи -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h6>Запись от {{ entry.date_created|date:"d.m.Y H:i" }}</h6>
+                        <p class="text-muted">{{ entry.text|truncatewords:30 }}</p>
+                        <div class="d-flex justify-content-between">
+                            <span class="badge {% if entry.mood_score > 0.3 %}bg-success{% elif entry.mood_score < -0.3 %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ entry.get_user_mood_tag_display }}
+                            </span>
+                            <small class="text-muted">{{ entry.word_count }} слов</small>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">Отмена</a>
+                        <button type="submit" class="btn btn-danger">Да, удалить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
