@@ -1,3 +1,151 @@
 from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
+from django.core.validators import MinValueValidator, MaxValueValidator
 
-# Create your models here.
+
+class DiaryEntry(models.Model):
+    """Модель для дневниковых записей пользователя"""
+
+    # Выбор для субъективной оценки настроения
+    MOOD_CHOICES = [
+        ('excellent', 'Отличное'),
+        ('good', 'Хорошее'),
+        ('neutral', 'Нейтральное'),
+        ('bad', 'Плохое'),
+        ('terrible', 'Ужасное'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='diary_entries',
+        verbose_name='Пользователь'
+    )
+    text = models.TextField(
+        verbose_name='Текст записи',
+        help_text='Опишите свой день, мысли, события...'
+    )
+    date_created = models.DateTimeField(
+        default=timezone.now,
+        verbose_name='Дата создания'
+    )
+    mood_score = models.FloatField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
+        verbose_name='Оценка настроения (авто)',
+        help_text='От -1 (очень негативное) до 1 (очень позитивное)'
+    )
+    user_mood_tag = models.CharField(
+        max_length=20,
+        choices=MOOD_CHOICES,
+        default='neutral',
+        verbose_name='Метка настроения'
+    )
+
+    # Автоматически рассчитываемые поля (для аналитики)
+    word_count = models.IntegerField(
+        default=0,
+        verbose_name='Количество слов'
+    )
+
+    class Meta:
+        verbose_name = 'Дневниковая запись'
+        verbose_name_plural = 'Дневниковые записи'
+        ordering = ['-date_created']  # Новые записи сначала
+        indexes = [
+            models.Index(fields=['user', 'date_created']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.date_created.strftime('%d.%m.%Y')} - {self.get_user_mood_tag_display()}"
+
+
+class ExtractedKeyword(models.Model):
+    """Модель для ключевых слов/тем, извлеченных из записей"""
+
+    CATEGORY_CHOICES = [
+        ('work', 'Работа'),
+        ('study', 'Учёба'),
+        ('family', 'Семья'),
+        ('friends', 'Друзья'),
+        ('health', 'Здоровье'),
+        ('hobby', 'Хобби'),
+        ('finance', 'Финансы'),
+        ('rest', 'Отдых'),
+        ('sport', 'Спорт'),
+        ('other', 'Другое'),
+    ]
+
+    word = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name='Ключевое слово/тема'
+    )
+    category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default='other',
+        verbose_name='Категория'
+    )
+
+    class Meta:
+        verbose_name = 'Ключевое слово'
+        verbose_name_plural = 'Ключевые слова'
+        ordering = ['word']
+
+    def __str__(self):
+        return f"{self.word} ({self.get_category_display()})"
+
+
+class MoodCorrelation(models.Model):
+    """Модель для хранения корреляций между темами и настроением пользователя"""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='mood_correlations',
+        verbose_name='Пользователь'
+    )
+    keyword = models.ForeignKey(
+        ExtractedKeyword,
+        on_delete=models.CASCADE,
+        related_name='correlations',
+        verbose_name='Ключевое слово'
+    )
+    correlation_score = models.FloatField(
+        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
+        verbose_name='Коэффициент корреляции',
+        help_text='-1: сильная негативная, 0: нет связи, 1: сильная позитивная'
+    )
+    occurrence_count = models.IntegerField(
+        default=0,
+        verbose_name='Количество упоминаний'
+    )
+    last_updated = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Последнее обновление'
+    )
+
+    class Meta:
+        verbose_name = 'Корреляция настроения'
+        verbose_name_plural = 'Корреляции настроений'
+        unique_together = ['user', 'keyword']  # Одна запись на пользователя+слово
+        ordering = ['user', '-correlation_score']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.keyword.word}: {self.correlation_score:.2f}"
+
+    def get_correlation_label(self):
+        """Возвращает текстовое описание корреляции"""
+        if self.correlation_score > 0.3:
+            return "Сильная позитивная"
+        elif self.correlation_score > 0.1:
+            return "Позитивная"
+        elif self.correlation_score < -0.3:
+            return "Сильная негативная"
+        elif self.correlation_score < -0.1:
+            return "Негативная"
+        else:
+            return "Нейтральная"
