@@ -10,18 +10,66 @@
                 <h4 class="mb-0">📈 Аналитика вашего настроения</h4>
             </div>
             <div class="card-body">
-                <p class="text-muted">Анализ основан на {{ positive_correlations.count|add:negative_correlations.count }} выявленных корреляциях</p>
+                <div class="row text-center mb-4">
+                    <div class="col-md-4">
+                        <h3>{{ total_entries }}</h3>
+                        <p class="text-muted">Всего записей</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3 class="{% if all_correlations_count > 10 %}text-success{% elif all_correlations_count > 0 %}text-warning{% else %}text-danger{% endif %}">
+                            {{ all_correlations_count }}
+                        </h3>
+                        <p class="text-muted">Выявленных корреляций</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3>
+                            {% if positive_correlations.count > negative_correlations.count %}
+                                <span class="text-success">👍</span>
+                            {% elif positive_correlations.count < negative_correlations.count %}
+                                <span class="text-danger">👎</span>
+                            {% else %}
+                                <span class="text-secondary">⚖️</span>
+                            {% endif %}
+                        </h3>
+                        <p class="text-muted">Баланс триггеров</p>
+                    </div>
+                </div>
+
+                <p class="text-muted text-center mb-0">
+                    Анализ основан на <strong>{{ all_correlations_count }}</strong> выявленных корреляциях
+                </p>
+
+                {% if all_correlations_count == 0 %}
+                <div class="alert alert-info mt-3">
+                    <h5>📊 Недостаточно данных для анализа</h5>
+                    <p class="mb-2">
+                        Для выявления триггеров настроения необходимо:
+                    </p>
+                    <ul class="mb-0">
+                        <li>Минимум 5-10 записей</li>
+                        <li>Записи с разным настроением (хорошим, плохим, нейтральным)</li>
+                        <li>Подробные описания событий и эмоций</li>
+                    </ul>
+                    <div class="mt-3">
+                        <a href="{% url 'create_entry' %}" class="btn btn-primary">Создать новую запись</a>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
+{% if all_correlations_count > 0 %}
 <div class="row">
     <!-- Позитивные триггеры -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header bg-success bg-opacity-10">
-                <h5 class="mb-0">👍 Что вас радует</h5>
+            <div class="card-header bg-success bg-opacity-10 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    👍 Что вас радует
+                </h5>
+                <span class="badge bg-success">{{ positive_correlations.count }}</span>
             </div>
             <div class="card-body">
                 {% if positive_correlations %}
@@ -29,26 +77,61 @@
                         {% for correlation in positive_correlations %}
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
-                                <strong>{{ correlation.keyword.word }}</strong>
-                                <small class="text-muted d-block">{{ correlation.keyword.get_category_display }}</small>
-                                <small>Упоминаний: {{ correlation.occurrence_count }}</small>
+                                <strong class="fs-5">{{ correlation.keyword.word }}</strong>
+                                <div class="mt-1">
+                                    <span class="badge bg-secondary">
+                                        {{ correlation.keyword.get_category_display }}
+                                    </span>
+                                    <small class="text-muted ms-2">
+                                        <i class="bi bi-arrow-repeat"></i> {{ correlation.occurrence_count }} раз
+                                    </small>
+                                </div>
                             </div>
                             <div class="text-end">
-                                <span class="badge bg-success rounded-pill fs-6">
-                                    +{{ correlation.correlation_score|floatformat:2 }}
+                                <span class="badge bg-success rounded-pill fs-5 px-3 py-2">
+                                    +{{ correlation.correlation_score|floatformat:3 }}
                                 </span>
                                 <div class="mt-1">
-                                    <small class="text-muted">{{ correlation.get_correlation_label }}</small>
+                                    <small class="text-muted">
+                                        {% if correlation.correlation_score > 0.5 %}
+                                            <strong>💪 Очень сильная позитивная связь</strong>
+                                        {% elif correlation.correlation_score > 0.3 %}
+                                            <strong>😊 Сильная позитивная связь</strong>
+                                        {% elif correlation.correlation_score > 0.15 %}
+                                            <strong>🙂 Позитивная связь</strong>
+                                        {% else %}
+                                            <strong>👍 Слабая позитивная связь</strong>
+                                        {% endif %}
+                                    </small>
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
+
+                    {% if positive_correlations.count == 0 %}
+                    <div class="text-center py-5">
+                        <div class="display-4 mb-3">📊</div>
+                        <h5>Позитивные триггеры не выявлены</h5>
+                        <p class="text-muted">Попробуйте создавать больше записей с хорошим настроением</p>
+                        <a href="{% url 'create_entry' %}" class="btn btn-outline-success">Создать позитивную запись</a>
+                    </div>
+                    {% endif %}
+
                 {% else %}
-                    <div class="text-center py-4">
-                        <div class="display-6 mb-3">📊</div>
-                        <p class="text-muted">Недостаточно данных для анализа позитивных триггеров</p>
-                        <small>Создайте больше записей для выявления закономерностей</small>
+                    <div class="text-center py-5">
+                        <div class="display-4 mb-3">📈</div>
+                        <h5>Пока нет выявленных позитивных триггеров</h5>
+                        <p class="text-muted mb-3">
+                            Система анализирует слова, которые чаще всего встречаются
+                            в ваших записях с хорошим настроением
+                        </p>
+                        <div class="alert alert-light">
+                            <small>
+                                <strong>Совет:</strong> Опишите подробнее моменты, когда чувствуете себя хорошо.
+                                Упоминайте конкретные события, людей, места.
+                            </small>
+                        </div>
                     </div>
                 {% endif %}
             </div>
@@ -58,8 +141,11 @@
     <!-- Негативные триггеры -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header bg-danger bg-opacity-10">
-                <h5 class="mb-0">👎 Что вас огорчает</h5>
+            <div class="card-header bg-danger bg-opacity-10 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    👎 Что вас огорчает
+                </h5>
+                <span class="badge bg-danger">{{ negative_correlations.count }}</span>
             </div>
             <div class="card-body">
                 {% if negative_correlations %}
@@ -67,26 +153,64 @@
                         {% for correlation in negative_correlations %}
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
-                                <strong>{{ correlation.keyword.word }}</strong>
-                                <small class="text-muted d-block">{{ correlation.keyword.get_category_display }}</small>
-                                <small>Упоминаний: {{ correlation.occurrence_count }}</small>
+                                <strong class="fs-5">{{ correlation.keyword.word }}</strong>
+                                <div class="mt-1">
+                                    <span class="badge bg-secondary">
+                                        {{ correlation.keyword.get_category_display }}
+                                    </span>
+                                    <small class="text-muted ms-2">
+                                        <i class="bi bi-arrow-repeat"></i> {{ correlation.occurrence_count }} раз
+                                    </small>
+                                </div>
                             </div>
                             <div class="text-end">
-                                <span class="badge bg-danger rounded-pill fs-6">
-                                    {{ correlation.correlation_score|floatformat:2 }}
+                                <span class="badge bg-danger rounded-pill fs-5 px-3 py-2">
+                                    {{ correlation.correlation_score|floatformat:3 }}
                                 </span>
                                 <div class="mt-1">
-                                    <small class="text-muted">{{ correlation.get_correlation_label }}</small>
+                                    <small class="text-muted">
+                                        {% if correlation.correlation_score < -0.5 %}
+                                            <strong>💔 Очень сильная негативная связь</strong>
+                                        {% elif correlation.correlation_score < -0.3 %}
+                                            <strong>😔 Сильная негативная связь</strong>
+                                        {% elif correlation.correlation_score < -0.15 %}
+                                            <strong>😕 Негативная связь</strong>
+                                        {% else %}
+                                            <strong>👎 Слабая негативная связь</strong>
+                                        {% endif %}
+                                    </small>
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
+
+                    {% if negative_correlations.count == 0 %}
+                    <div class="text-center py-5">
+                        <div class="display-4 mb-3">📉</div>
+                        <h5>Негативные триггеры не выявлены</h5>
+                        <p class="text-muted">Это хороший знак! Значит у вас мало записей с плохим настроением</p>
+                    </div>
+                    {% endif %}
+
                 {% else %}
-                    <div class="text-center py-4">
-                        <div class="display-6 mb-3">📉</div>
-                        <p class="text-muted">Недостаточно данных для анализа негативных триггеров</p>
-                        <small>Создайте больше записей для выявления закономерностей</small>
+                    <div class="text-center py-5">
+                        <div class="display-4 mb-3">📊</div>
+                        <h5>Пока нет выявленных негативных триггеров</h5>
+                        <p class="text-muted mb-3">
+                            Это может означать, что:
+                        </p>
+                        <ul class="text-start">
+                            <li>У вас мало записей с плохим настроением</li>
+                            <li>Вы редко упоминаете одни и те же факторы в негативном контексте</li>
+                            <li>Настроение не сильно связано с конкретными темами</li>
+                        </ul>
+                        <div class="alert alert-light mt-3">
+                            <small>
+                                <strong>Примечание:</strong> Отсутствие негативных триггеров - это хорошо!
+                                Это значит, что ваше плохое настроение не связано с постоянными факторами.
+                            </small>
+                        </div>
                     </div>
                 {% endif %}
             </div>
@@ -106,6 +230,74 @@
                 <div id="day-chart">
                     {{ day_chart_html|safe }}
                 </div>
+                <div class="mt-3 text-center text-muted">
+                    <small>Анализ показывает, в какие дни недели вы чаще всего чувствуете себя лучше или хуже</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Общая статистика -->
+{% if all_correlations_count >= 5 %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📊 Общая статистика по триггерам</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h2 class="text-success">{{ positive_correlations.count }}</h2>
+                                <p class="text-muted mb-0">Позитивных триггеров</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h2 class="text-danger">{{ negative_correlations.count }}</h2>
+                                <p class="text-muted mb-0">Негативных триггеров</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h2 class="text-primary">
+                                    {% with total=positive_correlations.count|add:negative_correlations.count %}
+                                        {% if total > 0 %}
+                                            {{ positive_correlations.count|floatformat:0 }}:{{ negative_correlations.count|floatformat:0 }}
+                                        {% else %}
+                                            0:0
+                                        {% endif %}
+                                    {% endwith %}
+                                </h2>
+                                <p class="text-muted mb-0">Соотношение +:-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h2>
+                                    {% if positive_correlations.count > negative_correlations.count %}
+                                        <span class="text-success">👍</span>
+                                    {% elif positive_correlations.count < negative_correlations.count %}
+                                        <span class="text-danger">👎</span>
+                                    {% else %}
+                                        <span class="text-warning">⚖️</span>
+                                    {% endif %}
+                                </h2>
+                                <p class="text-muted mb-0">Общий баланс</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -121,33 +313,138 @@
             </div>
             <div class="card-body">
                 <div class="row">
+                    {% if positive_correlations.count > 0 %}
                     <div class="col-md-6">
                         <div class="card border-success mb-3">
                             <div class="card-body">
-                                <h6>Увеличивайте позитивные факторы:</h6>
+                                <h6 class="text-success">
+                                    <i class="bi bi-lightbulb"></i> Увеличивайте позитивное влияние:
+                                </h6>
                                 <ul class="mb-0">
-                                    <li>Чаще планируйте занятия, связанные с вашими позитивными триггерами</li>
-                                    <li>Обращайте внимание на моменты, когда чувствуете себя хорошо</li>
-                                    <li>Записывайте успехи и приятные события</li>
+                                    <li>Чаще планируйте занятия, связанные с <strong>вашими позитивными триггерами</strong></li>
+                                    <li>Осознанно обращайте внимание на моменты, когда чувствуете себя хорошо</li>
+                                    <li>Записывайте успехи и приятные события, связанные с этими темами</li>
                                 </ul>
                             </div>
                         </div>
                     </div>
+                    {% endif %}
+
+                    {% if negative_correlations.count > 0 %}
                     <div class="col-md-6">
                         <div class="card border-danger mb-3">
                             <div class="card-body">
-                                <h6>Уменьшайте негативные факторы:</h6>
+                                <h6 class="text-danger">
+                                    <i class="bi bi-exclamation-triangle"></i> Уменьшайте негативное влияние:
+                                </h6>
                                 <ul class="mb-0">
-                                    <li>Планируйте способы избегания или смягчения негативных триггеров</li>
-                                    <li>Разрабатывайте стратегии coping с неприятными ситуациями</li>
+                                    <li>Разрабатывайте стратегии совладания с <strong>негативными триггерами</strong></li>
+                                    <li>Планируйте способы избегания или смягчения этих ситуаций</li>
                                     <li>Обращайтесь за поддержкой при необходимости</li>
                                 </ul>
                             </div>
                         </div>
                     </div>
+                    {% endif %}
+                </div>
+
+                {% if all_correlations_count < 5 %}
+                <div class="alert alert-warning mt-3">
+                    <h6><i class="bi bi-info-circle"></i> Для более точного анализа:</h6>
+                    <ul class="mb-0">
+                        <li>Создавайте хотя бы 1-2 записи в день в течение недели</li>
+                        <li>Описывайте не только события, но и свои чувства и мысли</li>
+                        <li>Упоминайте конкретных людей, места и занятия</li>
+                        <li>Не забывайте ставить метку настроения для каждой записи</li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="text-center mt-4">
+                    <a href="{% url 'create_entry' %}" class="btn btn-primary me-2">
+                        <i class="bi bi-plus-circle"></i> Создать новую запись
+                    </a>
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Вернуться в дневник
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
+
+<!-- Если совсем нет данных -->
+{% if all_correlations_count == 0 and total_entries < 3 %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🚀 Как начать анализ?</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card border-primary mb-3">
+                            <div class="card-body text-center">
+                                <div class="display-6 mb-3">1️⃣</div>
+                                <h6>Создавайте записи</h6>
+                                <p class="small">Минимум 5-10 записей с разным настроением</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-primary mb-3">
+                            <div class="card-body text-center">
+                                <div class="display-6 mb-3">2️⃣</div>
+                                <h6>Будьте подробными</h6>
+                                <p class="small">Описывайте события, людей, свои чувства и мысли</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-primary mb-3">
+                            <div class="card-body text-center">
+                                <div class="display-6 mb-3">3️⃣</div>
+                                <h6>Отмечайте настроение</h6>
+                                <p class="small">Ставьте метку настроения для каждой записи</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="{% url 'create_entry' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-rocket-takeoff"></i> Начать создавать записи
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.list-group-item {
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+.list-group-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.list-group-item:nth-child(odd) {
+    background-color: rgba(0,0,0,0.02);
+}
+.badge.bg-success {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+}
+.badge.bg-danger {
+    background: linear-gradient(135deg, #dc3545, #fd7e14) !important;
+}
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+}
+</style>
 {% endblock %}

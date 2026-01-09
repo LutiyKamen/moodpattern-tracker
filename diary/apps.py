@@ -6,7 +6,4 @@ class DiaryConfig(AppConfig):
     name = 'diary'
 
     def ready(self):
-        print("=== DiaryConfig.ready() вызван ===")
-        # Импортируем сигналы
         import diary.signals
-        print("=== Сигналы импортированы ===")

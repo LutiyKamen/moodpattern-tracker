@@ -199,50 +199,120 @@ def delete_entry(request, entry_id):
 @login_required
 def analytics(request):
     """Страница детальной аналитики"""
-    # Получаем корреляции пользователя
-    correlations = MoodCorrelation.objects.filter(user=request.user)
+    # Получаем ВСЕ корреляции пользователя
+    all_correlations = MoodCorrelation.objects.filter(user=request.user)
 
-    # Разделяем на позитивные и негативные
-    positive_correlations = correlations.filter(correlation_score__gt=0.1).order_by('-correlation_score')
-    negative_correlations = correlations.filter(correlation_score__lt=-0.1).order_by('correlation_score')
+    # Считаем общее количество
+    all_correlations_count = all_correlations.count()
+
+    # Разделяем на позитивные и негативные с либеральными порогами
+    positive_correlations = all_correlations.filter(
+        correlation_score__gt=0.05
+    ).order_by('-correlation_score')
+
+    negative_correlations = all_correlations.filter(
+        correlation_score__lt=-0.05
+    ).order_by('correlation_score')  # От самых негативных
+
+    # Если мало данных, показываем топ корреляций по абсолютному значению
+    if all_correlations_count > 0 and all_correlations_count < 10:
+        # Создаем список для ручной сортировки
+        correlations_list = list(all_correlations)
+        # Сортируем по абсолютному значению корреляции
+        correlations_list.sort(key=lambda x: abs(x.correlation_score), reverse=True)
+
+        # Если мало позитивных/негативных, показываем топ из всех
+        if positive_correlations.count() < 3:
+            # Берем топ-5 позитивных по абсолютному значению
+            top_positive = [c for c in correlations_list if c.correlation_score > 0][:5]
+            if top_positive:
+                positive_correlations = top_positive
+
+        if negative_correlations.count() < 3:
+            # Берем топ-5 негативных по абсолютному значению
+            top_negative = [c for c in correlations_list if c.correlation_score < 0][:5]
+            if top_negative:
+                negative_correlations = top_negative
 
     # Статистика по дням недели
     entries = DiaryEntry.objects.filter(user=request.user)
 
-    if entries.exists():
-        # Создаём DataFrame для анализа дней недели
-        df = pd.DataFrame(list(entries.values('date_created', 'mood_score')))
-        df['day_of_week'] = pd.to_datetime(df['date_created']).dt.day_name(locale='ru_RU')
+    day_chart_html = None
+    if entries.count() >= 3:  # Минимум 3 записи для графика
+        try:
+            # Создаём DataFrame для анализа дней недели
+            import pandas as pd
+            import plotly.express as px
+            import plotly.io as pio
 
-        # Среднее настроение по дням недели
-        mood_by_day = df.groupby('day_of_week')['mood_score'].mean().reindex([
-            'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'
-        ])
+            # Словарь для перевода дней недели
+            days_mapping = {
+                0: 'Понедельник',
+                1: 'Вторник',
+                2: 'Среда',
+                3: 'Четверг',
+                4: 'Пятница',
+                5: 'Суббота',
+                6: 'Воскресенье'
+            }
 
-        # Создаём график
-        fig = px.bar(
-            x=mood_by_day.index,
-            y=mood_by_day.values,
-            title='Среднее настроение по дням недели',
-            labels={'x': 'День недели', 'y': 'Среднее настроение'},
-            color=mood_by_day.values,
-            color_continuous_scale='RdYlGn'
-        )
+            # Собираем данные
+            data = []
+            for entry in entries:
+                if entry.date_created and entry.mood_score is not None:
+                    day_num = entry.date_created.weekday()  # 0=понедельник, 6=воскресенье
+                    data.append({
+                        'day_num': day_num,
+                        'day_name': days_mapping.get(day_num, 'Неизвестно'),
+                        'mood_score': entry.mood_score,
+                        'date': entry.date_created.date()
+                    })
 
-        fig.update_layout(
-            height=400,
-            margin=dict(l=20, r=20, t=40, b=20),
-            coloraxis_showscale=False
-        )
+            if data:
+                df = pd.DataFrame(data)
 
-        day_chart_html = pio.to_html(fig, full_html=False, config={'displayModeBar': False})
-    else:
-        day_chart_html = None
+                # Группируем по дням недели и считаем среднее
+                mood_by_day = df.groupby(['day_num', 'day_name'])['mood_score'].mean().reset_index()
+                mood_by_day = mood_by_day.sort_values('day_num')
+
+                # Создаём график
+                fig = px.bar(
+                    mood_by_day,
+                    x='day_name',
+                    y='mood_score',
+                    title='Среднее настроение по дням недели',
+                    labels={'day_name': 'День недели', 'mood_score': 'Среднее настроение'},
+                    color='mood_score',
+                    color_continuous_scale='RdYlGn',
+                    text=mood_by_day['mood_score'].round(2)
+                )
+
+                fig.update_traces(
+                    texttemplate='%{text:.2f}',
+                    textposition='outside',
+                    marker_line_width=0
+                )
+
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    coloraxis_showscale=False,
+                    showlegend=False,
+                    yaxis_range=[-1, 1]  # Фиксируем диапазон для настроения
+                )
+
+                day_chart_html = pio.to_html(fig, full_html=False, config={'displayModeBar': False})
+
+        except Exception as e:
+            print(f"Ошибка создания графика дней недели: {e}")
+            day_chart_html = None
 
     context = {
+        'all_correlations_count': all_correlations_count,
         'positive_correlations': positive_correlations,
         'negative_correlations': negative_correlations,
         'day_chart_html': day_chart_html,
+        'total_entries': entries.count(),
     }
 
     return render(request, 'diary/analytics.html', context)
