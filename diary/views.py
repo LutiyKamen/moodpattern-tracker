@@ -1,3 +1,5 @@
+from django.db.models import Avg, Count, Max, Min
+from diary.analytics_utils import calculate_statistics  # Добавить этот импорт
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -89,59 +91,94 @@ def dashboard(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Статистика
+    # Статистика - ИСПРАВЛЕНО: правильный расчет среднего
     total_entries = entries.count()
-    avg_mood = entries.aggregate(avg=Avg('mood_score'))['avg'] or 0
 
-    # Топ-триггеры
+    # Фильтруем записи с вычисленным mood_score
+    entries_with_score = entries.exclude(mood_score__isnull=True)
+    if entries_with_score.exists():
+        avg_mood = entries_with_score.aggregate(Avg('mood_score'))['mood_score__avg']
+    else:
+        avg_mood = 0
+
+    # Топ-триггеры - ИСПРАВЛЕНО: берем корреляции с достаточным количеством упоминаний
     top_correlations = MoodCorrelation.objects.filter(
-        user=request.user
-    ).exclude(
-        occurrence_count__lt=3  # Исключаем редкие слова
+        user=request.user,
+        occurrence_count__gte=2  # Минимум 2 упоминания
     ).order_by('-correlation_score')[:5]
 
-    # График настроения за последние 7 дней
-    seven_days_ago = datetime.now() - timedelta(days=7)
-    recent_entries = entries.filter(date_created__gte=seven_days_ago)
-
+    # График настроения за последние 7 дней - ИСПРАВЛЕНО: правильная логика
     mood_chart_html = None
-    if recent_entries.count() > 1:
-        # Создаём DataFrame для Plotly
-        df = pd.DataFrame(list(recent_entries.values('date_created', 'mood_score')))
-        df['date'] = pd.to_datetime(df['date_created']).dt.date
+    if entries_with_score.count() > 1:
+        try:
+            # Создаём DataFrame для Plotly
+            import pandas as pd
+            import plotly.express as px
+            import plotly.io as pio
 
-        # Группируем по дате
-        daily_avg = df.groupby('date')['mood_score'].mean().reset_index()
+            # Собираем данные за последние 7 дней
+            from datetime import datetime, timedelta
+            seven_days_ago = datetime.now() - timedelta(days=7)
 
-        # Создаём график
-        fig = px.line(
-            daily_avg,
-            x='date',
-            y='mood_score',
-            title='Динамика настроения за 7 дней',
-            labels={'date': 'Дата', 'mood_score': 'Настроение'},
-            markers=True
-        )
+            recent_entries = entries_with_score.filter(date_created__gte=seven_days_ago)
 
-        # Настраиваем график
-        fig.update_layout(
-            height=300,
-            margin=dict(l=20, r=20, t=40, b=20),
-            hovermode='x unified'
-        )
+            if recent_entries.count() >= 2:
+                data = []
+                for entry in recent_entries:
+                    data.append({
+                        'date': entry.date_created.date(),
+                        'mood_score': entry.mood_score,
+                        'mood_tag': entry.get_user_mood_tag_display()
+                    })
 
-        fig.update_traces(
-            line=dict(color='#4e73df', width=3),
-            marker=dict(size=8, color='#4e73df')
-        )
+                df = pd.DataFrame(data)
 
-        # Конвертируем в HTML
-        mood_chart_html = pio.to_html(fig, full_html=False, config={'displayModeBar': False})
+                # Группируем по дате (среднее за день)
+                daily_avg = df.groupby('date')['mood_score'].mean().reset_index()
+
+                # Создаём график
+                fig = px.line(
+                    daily_avg,
+                    x='date',
+                    y='mood_score',
+                    title='',
+                    labels={'date': 'Дата', 'mood_score': 'Настроение'},
+                    markers=True
+                )
+
+                # Настраиваем стиль в соответствии с дизайном
+                fig.update_layout(
+                    height=300,
+                    margin=dict(l=20, r=20, t=10, b=20),
+                    hovermode='x unified',
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    font=dict(color='#3c2f2f')
+                )
+
+                # Цвет линии в зависимости от среднего значения
+                avg_line = daily_avg['mood_score'].mean()
+                line_color = '#a8b8a5' if avg_line > 0 else '#8b6b4f' if avg_line < 0 else '#6c7b7d'
+
+                fig.update_traces(
+                    line=dict(color=line_color, width=2.5),
+                    marker=dict(size=6, color=line_color)
+                )
+
+                # Добавляем горизонтальную линию на 0
+                fig.add_hline(y=0, line_dash="dash", line_color="#d4c9be", opacity=0.5)
+
+                # Конвертируем в HTML
+                mood_chart_html = pio.to_html(fig, full_html=False, config={'displayModeBar': False})
+
+        except Exception as e:
+            print(f"Ошибка создания графика: {e}")
+            mood_chart_html = None
 
     context = {
         'page_obj': page_obj,
         'total_entries': total_entries,
-        'avg_mood': avg_mood,
+        'avg_mood': avg_mood or 0,  # Убедимся, что не None
         'top_correlations': top_correlations,
         'mood_chart_html': mood_chart_html,
     }
@@ -199,120 +236,63 @@ def delete_entry(request, entry_id):
 @login_required
 def analytics(request):
     """Страница детальной аналитики"""
-    # Получаем ВСЕ корреляции пользователя
-    all_correlations = MoodCorrelation.objects.filter(user=request.user)
+    from .analytics_utils import (
+        create_mood_timeline_chart,
+        create_weekday_chart,
+        create_mood_distribution_chart,
+        calculate_statistics
+    )
 
-    # Считаем общее количество
+    # Получаем все записи пользователя
+    entries = DiaryEntry.objects.filter(user=request.user)
+
+    # Получаем все корреляции пользователя
+    all_correlations = MoodCorrelation.objects.filter(user=request.user)
     all_correlations_count = all_correlations.count()
 
-    # Разделяем на позитивные и негативные с либеральными порогами
+    # Разделяем на позитивные и негативные с правильными порогами
     positive_correlations = all_correlations.filter(
-        correlation_score__gt=0.05
+        correlation_score__gt=0.05,
+        occurrence_count__gte=2  # Минимум 2 упоминания
     ).order_by('-correlation_score')
 
     negative_correlations = all_correlations.filter(
-        correlation_score__lt=-0.05
-    ).order_by('correlation_score')  # От самых негативных
+        correlation_score__lt=-0.05,
+        occurrence_count__gte=2  # Минимум 2 упоминания
+    ).order_by('correlation_score')
 
-    # Если мало данных, показываем топ корреляций по абсолютному значению
-    if all_correlations_count > 0 and all_correlations_count < 10:
-        # Создаем список для ручной сортировки
-        correlations_list = list(all_correlations)
-        # Сортируем по абсолютному значению корреляции
-        correlations_list.sort(key=lambda x: abs(x.correlation_score), reverse=True)
+    # Создаем графики
+    timeline_chart = create_mood_timeline_chart(entries)
+    weekday_chart = create_weekday_chart(entries)
+    distribution_chart = create_mood_distribution_chart(entries)
 
-        # Если мало позитивных/негативных, показываем топ из всех
-        if positive_correlations.count() < 3:
-            # Берем топ-5 позитивных по абсолютному значению
-            top_positive = [c for c in correlations_list if c.correlation_score > 0][:5]
-            if top_positive:
-                positive_correlations = top_positive
+    # Рассчитываем статистику
+    stats = calculate_statistics(request.user)
 
-        if negative_correlations.count() < 3:
-            # Берем топ-5 негативных по абсолютному значению
-            top_negative = [c for c in correlations_list if c.correlation_score < 0][:5]
-            if top_negative:
-                negative_correlations = top_negative
-
-    # Статистика по дням недели
-    entries = DiaryEntry.objects.filter(user=request.user)
-
-    day_chart_html = None
-    if entries.count() >= 3:  # Минимум 3 записи для графика
-        try:
-            # Создаём DataFrame для анализа дней недели
-            import pandas as pd
-            import plotly.express as px
-            import plotly.io as pio
-
-            # Словарь для перевода дней недели
-            days_mapping = {
-                0: 'Понедельник',
-                1: 'Вторник',
-                2: 'Среда',
-                3: 'Четверг',
-                4: 'Пятница',
-                5: 'Суббота',
-                6: 'Воскресенье'
-            }
-
-            # Собираем данные
-            data = []
-            for entry in entries:
-                if entry.date_created and entry.mood_score is not None:
-                    day_num = entry.date_created.weekday()  # 0=понедельник, 6=воскресенье
-                    data.append({
-                        'day_num': day_num,
-                        'day_name': days_mapping.get(day_num, 'Неизвестно'),
-                        'mood_score': entry.mood_score,
-                        'date': entry.date_created.date()
-                    })
-
-            if data:
-                df = pd.DataFrame(data)
-
-                # Группируем по дням недели и считаем среднее
-                mood_by_day = df.groupby(['day_num', 'day_name'])['mood_score'].mean().reset_index()
-                mood_by_day = mood_by_day.sort_values('day_num')
-
-                # Создаём график
-                fig = px.bar(
-                    mood_by_day,
-                    x='day_name',
-                    y='mood_score',
-                    title='Среднее настроение по дням недели',
-                    labels={'day_name': 'День недели', 'mood_score': 'Среднее настроение'},
-                    color='mood_score',
-                    color_continuous_scale='RdYlGn',
-                    text=mood_by_day['mood_score'].round(2)
-                )
-
-                fig.update_traces(
-                    texttemplate='%{text:.2f}',
-                    textposition='outside',
-                    marker_line_width=0
-                )
-
-                fig.update_layout(
-                    height=400,
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    coloraxis_showscale=False,
-                    showlegend=False,
-                    yaxis_range=[-1, 1]  # Фиксируем диапазон для настроения
-                )
-
-                day_chart_html = pio.to_html(fig, full_html=False, config={'displayModeBar': False})
-
-        except Exception as e:
-            print(f"Ошибка создания графика дней недели: {e}")
-            day_chart_html = None
+    # Названия дней недели для отображения
+    weekdays_ru = {
+        0: 'Понедельник',
+        1: 'Вторник',
+        2: 'Среда',
+        3: 'Четверг',
+        4: 'Пятница',
+        5: 'Суббота',
+        6: 'Воскресенье'
+    }
 
     context = {
         'all_correlations_count': all_correlations_count,
         'positive_correlations': positive_correlations,
         'negative_correlations': negative_correlations,
-        'day_chart_html': day_chart_html,
+        'timeline_chart': timeline_chart,
+        'weekday_chart': weekday_chart,
+        'distribution_chart': distribution_chart,
+        'stats': stats,
         'total_entries': entries.count(),
+        'best_day_name': weekdays_ru.get(stats['best_day'], 'Недостаточно данных') if stats[
+                                                                                          'best_day'] is not None else 'Недостаточно данных',
+        'worst_day_name': weekdays_ru.get(stats['worst_day'], 'Недостаточно данных') if stats[
+                                                                                            'worst_day'] is not None else 'Недостаточно данных',
     }
 
     return render(request, 'diary/analytics.html', context)

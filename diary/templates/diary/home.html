@@ -1,88 +1,110 @@
 {% extends 'diary/base.html' %}
 
-{% block title %}Главная - MoodPattern Tracker{% endblock %}
+{% block title %}MoodPattern | Анализ настроения через дневниковые записи{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-10">
         <!-- Герой-секция -->
-        <div class="card text-center">
+        <div class="card border-0 bg-transparent text-center mb-5">
             <div class="card-body py-5">
-                <h1 class="display-4 mb-4">📝 MoodPattern Tracker</h1>
-                <p class="lead mb-4">Анализируйте своё настроение, находите триггеры и улучшайте эмоциональное состояние</p>
+                <h1 class="display-5 fw-normal mb-4" style="color: var(--chocolate); font-family: 'Playfair Display', serif;">
+                    MoodPattern
+                </h1>
+                <p class="lead mb-4" style="color: var(--slate); max-width: 700px; margin: 0 auto;">
+                    Анализируйте своё настроение, находите закономерности и улучшайте эмоциональное состояние через ведение дневника
+                </p>
 
                 {% if not user.is_authenticated %}
                 <div class="mt-4">
-                    <a href="{% url 'register' %}" class="btn btn-primary btn-lg me-3">Начать бесплатно</a>
-                    <a href="{% url 'login' %}" class="btn btn-outline-primary btn-lg">Войти</a>
+                    <a href="{% url 'register' %}" class="btn btn-primary btn-lg me-3 px-4">
+                        <i class="bi bi-person-plus me-2"></i>Начать бесплатно
+                    </a>
+                    <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-lg px-4">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Войти
+                    </a>
                 </div>
                 {% else %}
                 <div class="mt-4">
-                    <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg">Перейти в личный кабинет</a>
+                    <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg px-4">
+                        <i class="bi bi-journal me-2"></i>Перейти в дневник
+                    </a>
                 </div>
                 {% endif %}
             </div>
         </div>
 
         <!-- Преимущества -->
-        <div class="row mt-4">
+        <div class="row mt-4 g-4">
             <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 mb-3">📊</div>
-                        <h5 class="card-title">Анализ настроения</h5>
-                        <p class="card-text">Автоматический анализ тональности ваших записей с помощью NLP</p>
+                <div class="card h-100 border-0">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-4">
+                            <i class="bi bi-bar-chart fs-1" style="color: var(--sage);"></i>
+                        </div>
+                        <h5 class="card-title mb-3" style="color: var(--chocolate);">Анализ настроения</h5>
+                        <p class="card-text" style="color: var(--slate);">
+                            Автоматический анализ тональности ваших записей с использованием технологий обработки естественного языка
+                        </p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 mb-3">🔍</div>
-                        <h5 class="card-title">Поиск триггеров</h5>
-                        <p class="card-text">Выявление факторов, которые влияют на ваше эмоциональное состояние</p>
+                <div class="card h-100 border-0">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-4">
+                            <i class="bi bi-search fs-1" style="color: var(--clay);"></i>
+                        </div>
+                        <h5 class="card-title mb-3" style="color: var(--chocolate);">Поиск закономерностей</h5>
+                        <p class="card-text" style="color: var(--slate);">
+                            Выявление факторов и триггеров, которые влияют на ваше эмоциональное состояние в течение времени
+                        </p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <div class="display-6 mb-3">📈</div>
-                        <h5 class="card-title">Визуализация</h5>
-                        <p class="card-text">Графики и статистика для наглядного отслеживания динамики</p>
+                <div class="card h-100 border-0">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-4">
+                            <i class="bi bi-graph-up fs-1" style="color: var(--slate);"></i>
+                        </div>
+                        <h5 class="card-title mb-3" style="color: var(--chocolate);">Визуализация данных</h5>
+                        <p class="card-text" style="color: var(--slate);">
+                            Наглядные графики и статистика для отслеживания динамики настроения и выявленных триггеров
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Демо-статистика -->
-        <div class="card mt-4">
+        <div class="card mt-5">
             <div class="card-header">
-                <h4 class="mb-0">Пример аналитики</h4>
+                <h5 class="mb-0"><i class="bi bi-clipboard-data me-2"></i>Пример аналитики</h5>
             </div>
             <div class="card-body">
                 <div class="row text-center">
-                    <div class="col-md-4">
-                        <h3>{{ demo_data.total_entries|default:"1250" }}</h3>
+                    <div class="col-md-4 mb-4">
+                        <h3 style="color: var(--chocolate);">{{ demo_data.total_entries|default:"1250" }}</h3>
                         <p class="text-muted">всего записей</p>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-4 mb-4">
                         <h3 class="mood-positive">+{{ demo_data.avg_mood|default:"0.35" }}</h3>
                         <p class="text-muted">среднее настроение</p>
                     </div>
-                    <div class="col-md-4">
-                        <h3>{{ demo_data.top_triggers|length|default:"3" }}</h3>
+                    <div class="col-md-4 mb-4">
+                        <h3 style="color: var(--chocolate);">{{ demo_data.top_triggers|length|default:"3" }}</h3>
                         <p class="text-muted">основных триггера</p>
                     </div>
                 </div>
 
                 {% if demo_data.top_triggers %}
-                <div class="mt-4">
-                    <h5>Топ-триггеры:</h5>
+                <div class="mt-3">
+                    <h6 class="mb-3" style="color: var(--chocolate);">Пример выявленных триггеров:</h6>
                     <div class="list-group">
                         {% for trigger in demo_data.top_triggers %}
                         <div class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ trigger.word }}
+                            <span>{{ trigger.word }}</span>
                             <span class="badge {% if trigger.correlation > 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
                                 {{ trigger.correlation|floatformat:2 }}
                             </span>
@@ -91,6 +113,45 @@
                     </div>
                 </div>
                 {% endif %}
+            </div>
+        </div>
+
+        <!-- Как это работает -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>Как это работает</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center mb-4">
+                        <div class="mb-3">
+                            <i class="bi bi-pencil-square fs-3" style="color: var(--sage);"></i>
+                        </div>
+                        <h6>Ведите дневник</h6>
+                        <p class="small text-muted">Регулярно записывайте свои мысли и события</p>
+                    </div>
+                    <div class="col-md-3 text-center mb-4">
+                        <div class="mb-3">
+                            <i class="bi bi-cpu fs-3" style="color: var(--clay);"></i>
+                        </div>
+                        <h6>Анализ</h6>
+                        <p class="small text-muted">Система анализирует тональность и выявляет ключевые слова</p>
+                    </div>
+                    <div class="col-md-3 text-center mb-4">
+                        <div class="mb-3">
+                            <i class="bi bi-graph-up-arrow fs-3" style="color: var(--slate);"></i>
+                        </div>
+                        <h6>Визуализация</h6>
+                        <p class="small text-muted">Получайте графики и статистику по вашему настроению</p>
+                    </div>
+                    <div class="col-md-3 text-center mb-4">
+                        <div class="mb-3">
+                            <i class="bi bi-lightbulb fs-3" style="color: var(--sage);"></i>
+                        </div>
+                        <h6>Инсайты</h6>
+                        <p class="small text-muted">Получайте рекомендации на основе выявленных закономерностей</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

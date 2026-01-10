@@ -1,13 +1,13 @@
 {% extends 'diary/base.html' %}
 
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{{ title }} | MoodPattern{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
-                <h4 class="mb-0">{{ title }}</h4>
+                <h4 class="mb-0"><i class="bi bi-pencil-square me-2"></i>{{ title }}</h4>
             </div>
             <div class="card-body">
                 <form method="post">
@@ -18,13 +18,14 @@
                         <label for="{{ form.text.id_for_label }}" class="form-label">{{ form.text.label }}</label>
                         {{ form.text }}
                         {% if form.text.help_text %}
-                        <div class="form-text">{{ form.text.help_text }}</div>
+                        <div class="form-text mt-1">{{ form.text.help_text }}</div>
                         {% endif %}
                         {% if form.text.errors %}
                         <div class="alert alert-danger mt-2">
                             {{ form.text.errors }}
                         </div>
                         {% endif %}
+                        <div id="word-counter" class="form-text mt-1">Слов: 0 (минимум 10)</div>
                     </div>
 
                     <!-- Поле настроения -->
@@ -39,11 +40,11 @@
                     </div>
 
                     <!-- Подсказки по настроению -->
-                    <div class="card mb-4">
+                    <div class="card mb-4" style="background-color: var(--cream); border-color: var(--taupe);">
                         <div class="card-body">
-                            <h6>🎯 Подсказка для метки настроения:</h6>
+                            <h6 class="mb-3"><i class="bi bi-info-circle me-2"></i>Подсказка для метки настроения</h6>
                             <div class="row">
-                                <div class="col">
+                                <div class="col-md-6">
                                     <div class="d-flex align-items-center mb-2">
                                         <span class="badge bg-success me-2">Отличное</span>
                                         <small>Ощущение счастья, энтузиазма</small>
@@ -57,7 +58,7 @@
                                         <small>Без особых эмоций</small>
                                     </div>
                                 </div>
-                                <div class="col">
+                                <div class="col-md-6">
                                     <div class="d-flex align-items-center mb-2">
                                         <span class="badge bg-warning me-2">Плохое</span>
                                         <small>Раздражение, грусть</small>
@@ -72,9 +73,15 @@
                     </div>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">Отмена</a>
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">
+                            <i class="bi bi-x-circle me-2"></i>Отмена
+                        </a>
                         <button type="submit" class="btn btn-primary">
-                            {% if title == 'Новая запись' %}Добавить запись{% else %}Сохранить изменения{% endif %}
+                            {% if title == 'Новая запись' %}
+                                <i class="bi bi-plus-circle me-2"></i>Добавить запись
+                            {% else %}
+                                <i class="bi bi-check-circle me-2"></i>Сохранить изменения
+                            {% endif %}
                         </button>
                     </div>
                 </form>
@@ -92,22 +99,21 @@ document.getElementById('{{ form.text.id_for_label }}').addEventListener('input'
     const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
     const counter = document.getElementById('word-counter');
 
-    if (!counter) {
-        // Создаем счетчик если его нет
-        const counterElement = document.createElement('div');
-        counterElement.id = 'word-counter';
-        counterElement.className = 'form-text mt-1';
-        this.parentNode.appendChild(counterElement);
-    }
-
-    document.getElementById('word-counter').textContent =
-        `Слов: ${wordCount} (минимум 10)`;
+    counter.textContent = `Слов: ${wordCount} (минимум 10)`;
 
     // Подсветка если мало слов
     if (wordCount < 10) {
-        document.getElementById('word-counter').style.color = '#dc3545';
+        counter.style.color = '#8b6b4f';
     } else {
-        document.getElementById('word-counter').style.color = '#198754';
+        counter.style.color = 'var(--sage)';
+    }
+});
+
+// Инициализация счетчика при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    const textarea = document.getElementById('{{ form.text.id_for_label }}');
+    if (textarea && textarea.value) {
+        textarea.dispatchEvent(new Event('input'));
     }
 });
 </script>

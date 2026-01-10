@@ -1,17 +1,17 @@
 {% extends 'diary/base.html' %}
 
-{% block title %}Удаление записи{% endblock %}
+{% block title %}Удаление записи | MoodPattern{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h4 class="mb-0">🗑️ Удаление записи</h4>
+                <h4 class="mb-0"><i class="bi bi-trash me-2"></i>Удаление записи</h4>
             </div>
             <div class="card-body">
                 <div class="alert alert-warning">
-                    <h5>Вы уверены, что хотите удалить эту запись?</h5>
+                    <h5><i class="bi bi-exclamation-triangle me-2"></i>Вы уверены, что хотите удалить эту запись?</h5>
                     <p class="mb-0">Это действие нельзя отменить. Вся аналитика, связанная с этой записью, будет обновлена.</p>
                 </div>
 
@@ -32,8 +32,12 @@
                 <form method="post">
                     {% csrf_token %}
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">Отмена</a>
-                        <button type="submit" class="btn btn-danger">Да, удалить</button>
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">
+                            <i class="bi bi-x-circle me-2"></i>Отмена
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-2"></i>Да, удалить
+                        </button>
                     </div>
                 </form>
             </div>
