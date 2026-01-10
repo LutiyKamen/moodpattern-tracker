@@ -1,43 +1,45 @@
-from django.db.models import Avg, Count, Max, Min
-from diary.analytics_utils import calculate_statistics  # Добавить этот импорт
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import login, logout
-from django.db.models import Count, Avg
 from django.core.paginator import Paginator
+from django.db.models import Avg, Count
+from datetime import datetime, timedelta
+import pandas as pd
 import plotly.express as px
 import plotly.io as pio
-import pandas as pd
-from datetime import datetime, timedelta
+
 from .models import DiaryEntry, MoodCorrelation
 from .forms import DiaryEntryForm, UserRegisterForm, UserLoginForm
+from .analysis_utils import (
+    calculate_statistics,
+    create_mood_timeline_chart,
+    create_weekday_chart,
+    create_mood_distribution_chart
+)
 
 
 def home(request):
-    """Главная страница (публичная)"""
-    context = {}
-
-    # Показываем демо-статистику для гостей
+    """Главная страница"""
     if request.user.is_authenticated:
         return redirect('dashboard')
 
-    # Пример аналитики для демонстрации
-    context['demo_data'] = {
-        'total_entries': 1250,
-        'avg_mood': 0.35,
-        'top_triggers': [
-            {'word': 'работа', 'correlation': -0.42},
-            {'word': 'друзья', 'correlation': 0.78},
-            {'word': 'спорт', 'correlation': 0.65},
-        ]
+    context = {
+        'demo_data': {
+            'total_entries': 1250,
+            'avg_mood': 0.35,
+            'top_triggers': [
+                {'word': 'работа', 'correlation': -0.42},
+                {'word': 'друзья', 'correlation': 0.78},
+                {'word': 'спорт', 'correlation': 0.65},
+            ]
+        }
     }
-
     return render(request, 'diary/home.html', context)
 
 
 def register_view(request):
-    """Регистрация пользователя"""
+    """Регистрация"""
     if request.user.is_authenticated:
         return redirect('dashboard')
 
@@ -46,7 +48,7 @@ def register_view(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            messages.success(request, 'Регистрация прошла успешно! Добро пожаловать!')
+            messages.success(request, 'Регистрация прошла успешно!')
             return redirect('dashboard')
     else:
         form = UserRegisterForm()
@@ -55,7 +57,7 @@ def register_view(request):
 
 
 def login_view(request):
-    """Авторизация пользователя"""
+    """Авторизация"""
     if request.user.is_authenticated:
         return redirect('dashboard')
 
@@ -74,7 +76,7 @@ def login_view(request):
 
 @login_required
 def logout_view(request):
-    """Выход из системы"""
+    """Выход"""
     logout(request)
     messages.info(request, 'Вы успешно вышли из системы.')
     return redirect('home')
@@ -82,8 +84,8 @@ def logout_view(request):
 
 @login_required
 def dashboard(request):
-    """Личный кабинет пользователя"""
-    # Получаем записи пользователя
+    """Личный кабинет"""
+    # Записи пользователя
     entries = DiaryEntry.objects.filter(user=request.user).order_by('-date_created')
 
     # Пагинация
@@ -91,94 +93,44 @@ def dashboard(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Статистика - ИСПРАВЛЕНО: правильный расчет среднего
+    # Статистика
     total_entries = entries.count()
-
-    # Фильтруем записи с вычисленным mood_score
     entries_with_score = entries.exclude(mood_score__isnull=True)
+
     if entries_with_score.exists():
-        avg_mood = entries_with_score.aggregate(Avg('mood_score'))['mood_score__avg']
+        avg_mood = entries_with_score.aggregate(Avg('mood_score'))['mood_score__avg'] or 0
     else:
         avg_mood = 0
 
-    # Топ-триггеры - ИСПРАВЛЕНО: берем корреляции с достаточным количеством упоминаний
+    # Записи за сегодня
+    from datetime import date
+    today_entries = entries.filter(date_created__date=date.today()).count()
+
+    # Топ-триггеры
     top_correlations = MoodCorrelation.objects.filter(
         user=request.user,
-        occurrence_count__gte=2  # Минимум 2 упоминания
-    ).order_by('-correlation_score')[:5]
+        occurrence_count__gte=2
+    ).order_by('-correlation_score')[:3]
 
-    # График настроения за последние 7 дней - ИСПРАВЛЕНО: правильная логика
+    # График за 7 дней
     mood_chart_html = None
     if entries_with_score.count() > 1:
         try:
-            # Создаём DataFrame для Plotly
-            import pandas as pd
-            import plotly.express as px
-            import plotly.io as pio
-
-            # Собираем данные за последние 7 дней
-            from datetime import datetime, timedelta
             seven_days_ago = datetime.now() - timedelta(days=7)
-
             recent_entries = entries_with_score.filter(date_created__gte=seven_days_ago)
 
             if recent_entries.count() >= 2:
-                data = []
-                for entry in recent_entries:
-                    data.append({
-                        'date': entry.date_created.date(),
-                        'mood_score': entry.mood_score,
-                        'mood_tag': entry.get_user_mood_tag_display()
-                    })
-
-                df = pd.DataFrame(data)
-
-                # Группируем по дате (среднее за день)
-                daily_avg = df.groupby('date')['mood_score'].mean().reset_index()
-
-                # Создаём график
-                fig = px.line(
-                    daily_avg,
-                    x='date',
-                    y='mood_score',
-                    title='',
-                    labels={'date': 'Дата', 'mood_score': 'Настроение'},
-                    markers=True
-                )
-
-                # Настраиваем стиль в соответствии с дизайном
-                fig.update_layout(
-                    height=300,
-                    margin=dict(l=20, r=20, t=10, b=20),
-                    hovermode='x unified',
-                    plot_bgcolor='white',
-                    paper_bgcolor='white',
-                    font=dict(color='#3c2f2f')
-                )
-
-                # Цвет линии в зависимости от среднего значения
-                avg_line = daily_avg['mood_score'].mean()
-                line_color = '#a8b8a5' if avg_line > 0 else '#8b6b4f' if avg_line < 0 else '#6c7b7d'
-
-                fig.update_traces(
-                    line=dict(color=line_color, width=2.5),
-                    marker=dict(size=6, color=line_color)
-                )
-
-                # Добавляем горизонтальную линию на 0
-                fig.add_hline(y=0, line_dash="dash", line_color="#d4c9be", opacity=0.5)
-
-                # Конвертируем в HTML
-                mood_chart_html = pio.to_html(fig, full_html=False, config={'displayModeBar': False})
+                mood_chart_html = create_mood_timeline_chart(recent_entries)
 
         except Exception as e:
-            print(f"Ошибка создания графика: {e}")
+            print(f"Ошибка графика: {e}")
             mood_chart_html = None
 
     context = {
         'page_obj': page_obj,
         'total_entries': total_entries,
-        'avg_mood': avg_mood or 0,  # Убедимся, что не None
+        'avg_mood': avg_mood,
+        'today_entries': today_entries,
         'top_correlations': top_correlations,
         'mood_chart_html': mood_chart_html,
     }
@@ -188,14 +140,14 @@ def dashboard(request):
 
 @login_required
 def create_entry(request):
-    """Создание новой записи"""
+    """Создание записи"""
     if request.method == 'POST':
         form = DiaryEntryForm(request.POST)
         if form.is_valid():
             entry = form.save(commit=False)
             entry.user = request.user
             entry.save()
-            messages.success(request, 'Запись успешно добавлена! Анализ настроения выполнен.')
+            messages.success(request, 'Запись успешно добавлена!')
             return redirect('dashboard')
     else:
         form = DiaryEntryForm()
@@ -205,7 +157,7 @@ def create_entry(request):
 
 @login_required
 def edit_entry(request, entry_id):
-    """Редактирование существующей записи"""
+    """Редактирование записи"""
     entry = get_object_or_404(DiaryEntry, id=entry_id, user=request.user)
 
     if request.method == 'POST':
@@ -235,30 +187,18 @@ def delete_entry(request, entry_id):
 
 @login_required
 def analytics(request):
-    """Страница детальной аналитики"""
-    from .analytics_utils import (
-        create_mood_timeline_chart,
-        create_weekday_chart,
-        create_mood_distribution_chart,
-        calculate_statistics
-    )
-
-    # Получаем все записи пользователя
+    """Аналитика"""
+    # Получаем данные
     entries = DiaryEntry.objects.filter(user=request.user)
-
-    # Получаем все корреляции пользователя
     all_correlations = MoodCorrelation.objects.filter(user=request.user)
-    all_correlations_count = all_correlations.count()
 
-    # Разделяем на позитивные и негативные с правильными порогами
+    # Разделяем корреляции
     positive_correlations = all_correlations.filter(
-        correlation_score__gt=0.05,
-        occurrence_count__gte=2  # Минимум 2 упоминания
+        correlation_score__gt=0.05
     ).order_by('-correlation_score')
 
     negative_correlations = all_correlations.filter(
-        correlation_score__lt=-0.05,
-        occurrence_count__gte=2  # Минимум 2 упоминания
+        correlation_score__lt=-0.05
     ).order_by('correlation_score')
 
     # Создаем графики
@@ -266,22 +206,17 @@ def analytics(request):
     weekday_chart = create_weekday_chart(entries)
     distribution_chart = create_mood_distribution_chart(entries)
 
-    # Рассчитываем статистику
+    # Статистика
     stats = calculate_statistics(request.user)
 
-    # Названия дней недели для отображения
+    # Дни недели
     weekdays_ru = {
-        0: 'Понедельник',
-        1: 'Вторник',
-        2: 'Среда',
-        3: 'Четверг',
-        4: 'Пятница',
-        5: 'Суббота',
-        6: 'Воскресенье'
+        0: 'Понедельник', 1: 'Вторник', 2: 'Среда', 3: 'Четверг',
+        4: 'Пятница', 5: 'Суббота', 6: 'Воскресенье'
     }
 
     context = {
-        'all_correlations_count': all_correlations_count,
+        'all_correlations_count': all_correlations.count(),
         'positive_correlations': positive_correlations,
         'negative_correlations': negative_correlations,
         'timeline_chart': timeline_chart,
@@ -289,10 +224,10 @@ def analytics(request):
         'distribution_chart': distribution_chart,
         'stats': stats,
         'total_entries': entries.count(),
-        'best_day_name': weekdays_ru.get(stats['best_day'], 'Недостаточно данных') if stats[
-                                                                                          'best_day'] is not None else 'Недостаточно данных',
-        'worst_day_name': weekdays_ru.get(stats['worst_day'], 'Недостаточно данных') if stats[
-                                                                                            'worst_day'] is not None else 'Недостаточно данных',
+        'best_day_name': weekdays_ru.get(stats['best_day'], 'Недостаточно данных')
+        if stats['best_day'] is not None else 'Недостаточно данных',
+        'worst_day_name': weekdays_ru.get(stats['worst_day'], 'Недостаточно данных')
+        if stats['worst_day'] is not None else 'Недостаточно данных',
     }
 
     return render(request, 'diary/analytics.html', context)

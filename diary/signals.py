@@ -2,7 +2,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from .models import DiaryEntry, ExtractedKeyword, MoodCorrelation
-from textblob import TextBlob
+from .analysis_utils import analyze_text_sentiment, extract_keywords
 import re
 from collections import Counter
 import logging
@@ -20,7 +20,7 @@ except LookupError:
 # Русские стоп-слова
 RUSSIAN_STOPWORDS = set(stopwords.words('russian'))
 
-# Дополнительные стоп-слова для нашего контекста
+# Дополнительные стоп-слова
 EXTRA_STOPWORDS = {
     'это', 'вот', 'какой', 'который', 'сегодня', 'завтра', 'вчера',
     'очень', 'просто', 'можно', 'нужно', 'будет', 'есть', 'был', 'была',
@@ -28,17 +28,6 @@ EXTRA_STOPWORDS = {
     'само', 'сами', 'раз', 'два', 'три', 'четыре', 'пять', 'год', 'года',
     'лет', 'время', 'человек', 'люди', 'жизнь', 'деньги', 'работа',
     'дом', 'город', 'страна', 'мир', 'слово', 'дела', 'руки', 'глаза',
-    'вода', 'земля', 'небо', 'солнце', 'луна', 'звезда', 'воздух',
-    'огромный', 'маленький', 'большой', 'хороший', 'плохой', 'новый',
-    'старый', 'молодой', 'красивый', 'сильный', 'слабый', 'умный',
-    'глупый', 'богатый', 'бедный', 'счастливый', 'грустный', 'веселый',
-    'серьезный', 'важный', 'нужный', 'возможный', 'необходимый',
-    'записи', 'запись', 'записей', 'ключевые', 'ключевых', 'корреляций',
-    'корреляции', 'настроение', 'настроения', 'анализ', 'анализа',
-    'система', 'системы', 'проект', 'проекта', 'данные', 'данных',
-    'пользователь', 'пользователя', 'сервис', 'сервиса', 'дневник',
-    'дневника', 'модель', 'модели', 'программа', 'программы',
-    'тест', 'теста', 'тестирование', 'тестирования'
 }
 
 ALL_STOPWORDS = RUSSIAN_STOPWORDS.union(EXTRA_STOPWORDS)
@@ -74,105 +63,60 @@ def get_category_for_word(word):
 
 def extract_meaningful_words(text):
     """Извлекает значимые слова из текста"""
-    # Приводим к нижнему регистру
     text = text.lower()
-
-    # Удаляем знаки препинания, оставляем только русские буквы и пробелы
     text = re.sub(r'[^\w\s]', ' ', text)
     text = re.sub(r'\d+', ' ', text)
 
-    # Разделяем на слова
     words = re.findall(r'\b[а-яё]{3,15}\b', text)
 
-    # Фильтруем стоп-слова
     meaningful_words = []
     for word in words:
         if (word not in ALL_STOPWORDS and
-                len(word) >= 4 and  # Минимум 4 буквы
-                not re.match(r'^[а-яё]+\-[а-яё]+$', word)):  # Исключаем слова с дефисом
+                len(word) >= 4):
             meaningful_words.append(word)
 
     return meaningful_words
 
 
 @receiver(post_save, sender=DiaryEntry)
-def analyze_diary_entry(sender, instance, created, **kwargs):
-    """
-    Анализирует дневниковую запись при сохранении
-    """
-    print(f"\n=== АНАЛИЗ ЗАПИСИ {instance.id} ===")
-
+def analyze_diary_entry_on_save(sender, instance, created, **kwargs):
+    """Анализирует дневниковую запись при сохранении"""
     try:
-        # 1. Анализ тональности
-        blob = TextBlob(instance.text)
-        sentiment = blob.sentiment
-        mood_score = sentiment.polarity
+        # Анализируем тональность
+        mood_score = analyze_text_sentiment(instance.text)
 
-        print(f"Текст: {instance.text[:50]}...")
-        print(f"Оценка настроения: {mood_score:.3f}")
-
-        # Сохраняем оценку
-        instance.mood_score = mood_score
-        instance.word_count = len(instance.text.split())
-
-        # Сохраняем без рекурсии
+        # Обновляем запись без рекурсии
         DiaryEntry.objects.filter(pk=instance.pk).update(
             mood_score=mood_score,
-            word_count=instance.word_count
+            word_count=len(instance.text.split())
         )
 
-        # 2. Извлечение значимых слов
-        meaningful_words = extract_meaningful_words(instance.text)
+        logger.info(f"Запись {instance.id} проанализирована. Настроение: {mood_score:.2f}")
 
-        if not meaningful_words:
-            print("Не найдено значимых слов")
-            return
+        # Извлекаем ключевые слова
+        keywords = extract_keywords(instance.text)
+        word_counts = Counter(keywords)
 
-        print(f"Значимые слова ({len(meaningful_words)}): {meaningful_words[:10]}")
+        # Обрабатываем каждое слово
+        for word, count in word_counts.items():
+            if count >= 1:  # Минимум 1 упоминание
+                category = get_category_for_word(word)
 
-        # 3. Находим самые частые слова (минимум 2 упоминания)
-        word_counts = Counter(meaningful_words)
+                # Создаем или получаем ключевое слово
+                keyword, _ = ExtractedKeyword.objects.get_or_create(
+                    word=word,
+                    defaults={'category': category}
+                )
 
-        # Берем слова, которые встречаются хотя бы 2 раза
-        significant_words = [(word, count) for word, count in word_counts.items()
-                             if count >= 2]
-
-        # Или топ-5 слов, если нет повторяющихся
-        if not significant_words and meaningful_words:
-            significant_words = word_counts.most_common(5)
-
-        print(f"Значимые для анализа ({len(significant_words)}): {significant_words}")
-
-        # 4. Обрабатываем каждое значимое слово
-        for word, count in significant_words:
-            # Определяем категорию
-            category = get_category_for_word(word)
-
-            # Создаем или получаем ключевое слово
-            keyword, kw_created = ExtractedKeyword.objects.get_or_create(
-                word=word,
-                defaults={'category': category}
-            )
-
-            if kw_created:
-                print(f"  Новое слово: '{word}' → категория '{category}'")
-            else:
-                print(f"  Существующее слово: '{word}'")
-
-            # 5. Обновляем корреляцию
-            update_mood_correlation(instance.user, keyword, mood_score, count)
-
-        print(f"=== АНАЛИЗ ЗАВЕРШЕН ===\n")
+                # Обновляем корреляцию
+                update_mood_correlation(instance.user, keyword, mood_score, count)
 
     except Exception as e:
-        print(f"ОШИБКА: {str(e)}")
         logger.error(f"Ошибка при анализе записи {instance.id}: {str(e)}")
 
 
 def update_mood_correlation(user, keyword, mood_score, occurrence_increment=1):
-    """
-    Обновляет корреляцию между словом и настроением
-    """
+    """Обновляет корреляцию между словом и настроением"""
     try:
         correlation, created = MoodCorrelation.objects.get_or_create(
             user=user,
@@ -183,20 +127,18 @@ def update_mood_correlation(user, keyword, mood_score, occurrence_increment=1):
             }
         )
 
-        if created:
-            print(f"    Новая корреляция: {keyword.word} = {mood_score:.3f}")
-        else:
-            # Взвешенное обновление корреляции
+        if not created:
+            # Обновляем существующую корреляцию
             total_occurrences = correlation.occurrence_count + occurrence_increment
 
-            # Более сильное влияние новых данных
-            old_weight = correlation.occurrence_count / (total_occurrences * 1.5)
-            new_weight = occurrence_increment / (total_occurrences * 0.5)
+            # Взвешенное обновление
+            old_weight = correlation.occurrence_count / total_occurrences
+            new_weight = occurrence_increment / total_occurrences
 
             new_correlation = (
-                                      correlation.correlation_score * old_weight +
-                                      mood_score * new_weight
-                              ) / (old_weight + new_weight)
+                    correlation.correlation_score * old_weight +
+                    mood_score * new_weight
+            )
 
             # Ограничиваем диапазон
             new_correlation = max(-1.0, min(1.0, new_correlation))
@@ -205,79 +147,83 @@ def update_mood_correlation(user, keyword, mood_score, occurrence_increment=1):
             correlation.occurrence_count = total_occurrences
             correlation.save()
 
-            print(f"    Обновлена корреляция: {keyword.word} = {new_correlation:.3f} "
-                  f"(было {correlation.correlation_score:.3f})")
-
     except Exception as e:
-        print(f"    ОШИБКА корреляции: {str(e)}")
+        logger.error(f"Ошибка при обновлении корреляции: {str(e)}")
+
+
+@receiver(post_delete, sender=DiaryEntry)
+def handle_entry_deletion(sender, instance, **kwargs):
+    """Обрабатывает удаление записи"""
+    try:
+        # Можно добавить пересчет корреляций при удалении
+        # или просто логирование
+        logger.info(f"Запись {instance.id} удалена пользователем {instance.user.username}")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке удаления записи: {str(e)}")
 
 
 @receiver(post_save, sender=DiaryEntry)
-def recalculate_all_correlations(sender, instance, **kwargs):
-    """
-    Пересчитывает все корреляции пользователя при добавлении нескольких записей
-    """
-    # Запускаем пересчет только если у пользователя больше 5 записей
-    user_entries_count = DiaryEntry.objects.filter(user=instance.user).count()
+def recalculate_periodically(sender, instance, **kwargs):
+    """Периодический пересчет корреляций"""
+    try:
+        user_entries_count = DiaryEntry.objects.filter(user=instance.user).count()
 
-    if user_entries_count >= 5 and user_entries_count % 5 == 0:
-        print(f"\n=== ПЕРЕСЧЕТ КОРРЕЛЯЦИЙ для {instance.user.username} ===")
-        recalculate_user_correlations(instance.user)
+        # Пересчитываем каждые 10 записей
+        if user_entries_count >= 10 and user_entries_count % 10 == 0:
+            recalculate_user_correlations(instance.user)
+    except Exception as e:
+        logger.error(f"Ошибка при периодическом пересчете: {str(e)}")
 
 
 def recalculate_user_correlations(user):
-    """
-    Полный пересчет корреляций для пользователя
-    """
+    """Полный пересчет корреляций для пользователя"""
     from django.db.models import Avg
 
-    # Удаляем старые корреляции
-    MoodCorrelation.objects.filter(user=user).delete()
+    try:
+        # Удаляем старые корреляции
+        MoodCorrelation.objects.filter(user=user).delete()
 
-    # Получаем все записи пользователя
-    entries = DiaryEntry.objects.filter(user=user)
+        # Получаем все записи пользователя
+        entries = DiaryEntry.objects.filter(user=user).exclude(mood_score__isnull=True)
 
-    if entries.count() < 3:
-        return
+        if entries.count() < 3:
+            return
 
-    # Собираем статистику по всем словам
-    word_stats = {}
+        # Собираем статистику по всем словам
+        word_stats = {}
 
-    for entry in entries:
-        if entry.mood_score is None:
-            continue
+        for entry in entries:
+            words = extract_meaningful_words(entry.text)
 
-        words = extract_meaningful_words(entry.text)
+            for word in set(words):
+                if word not in word_stats:
+                    word_stats[word] = {
+                        'mood_scores': [],
+                        'count': 0
+                    }
 
-        for word in set(words):  # Уникальные слова в записи
-            if word not in word_stats:
-                word_stats[word] = {
-                    'mood_scores': [],
-                    'count': 0
-                }
+                word_stats[word]['mood_scores'].append(entry.mood_score)
+                word_stats[word]['count'] += 1
 
-            word_stats[word]['mood_scores'].append(entry.mood_score)
-            word_stats[word]['count'] += 1
+        # Создаем корреляции для часто встречающихся слов
+        for word, stats in word_stats.items():
+            if stats['count'] >= 2:
+                avg_mood = sum(stats['mood_scores']) / len(stats['mood_scores'])
 
-    # Создаем корреляции для часто встречающихся слов
-    for word, stats in word_stats.items():
-        if stats['count'] >= 2:  # Слово должно встречаться минимум в 2 записях
-            avg_mood = sum(stats['mood_scores']) / len(stats['mood_scores'])
+                category = get_category_for_word(word)
+                keyword, _ = ExtractedKeyword.objects.get_or_create(
+                    word=word,
+                    defaults={'category': category}
+                )
 
-            # Создаем ключевое слово
-            category = get_category_for_word(word)
-            keyword, _ = ExtractedKeyword.objects.get_or_create(
-                word=word,
-                defaults={'category': category}
-            )
+                MoodCorrelation.objects.create(
+                    user=user,
+                    keyword=keyword,
+                    correlation_score=avg_mood,
+                    occurrence_count=stats['count']
+                )
 
-            # Создаем корреляцию
-            MoodCorrelation.objects.create(
-                user=user,
-                keyword=keyword,
-                correlation_score=avg_mood,
-                occurrence_count=stats['count']
-            )
+        logger.info(f"Пересчет корреляций для {user.username} завершен")
 
-    print(f"Пересчитано {len(word_stats)} слов, создано корреляций: "
-          f"{MoodCorrelation.objects.filter(user=user).count()}")
+    except Exception as e:
+        logger.error(f"Ошибка при пересчете корреляций: {str(e)}")

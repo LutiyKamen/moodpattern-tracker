@@ -1,4 +1,4 @@
-from django.apps import AppConfig  # ← ДОБАВЬТЕ ЭТУ СТРОКУ!
+from django.apps import AppConfig
 
 
 class DiaryConfig(AppConfig):
@@ -6,4 +6,5 @@ class DiaryConfig(AppConfig):
     name = 'diary'
 
     def ready(self):
+        # Подключаем сигналы
         import diary.signals
