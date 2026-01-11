@@ -43,10 +43,22 @@ def register_view(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            messages.success(request, 'Регистрация прошла успешно!')
-            return redirect('dashboard')
+            try:
+                user = form.save()
+                login(request, user)
+                messages.success(request, 'Регистрация прошла успешно!')
+                return redirect('dashboard')
+            except Exception as e:
+                # Логируем ошибку для отладки
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Ошибка при регистрации: {str(e)}")
+                messages.error(request, f'Ошибка при регистрации: {str(e)}')
+        else:
+            # Показываем ошибки формы
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = UserRegisterForm()
 

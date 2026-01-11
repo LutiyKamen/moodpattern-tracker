@@ -155,24 +155,16 @@ def update_mood_correlation(user, keyword, mood_score, occurrence_increment=1):
 def handle_entry_deletion(sender, instance, **kwargs):
     """Обрабатывает удаление записи"""
     try:
-        # Можно добавить пересчет корреляций при удалении
-        # или просто логирование
         logger.info(f"Запись {instance.id} удалена пользователем {instance.user.username}")
     except Exception as e:
         logger.error(f"Ошибка при обработке удаления записи: {str(e)}")
 
 
-@receiver(post_save, sender=DiaryEntry)
-def recalculate_periodically(sender, instance, **kwargs):
-    """Периодический пересчет корреляций"""
-    try:
-        user_entries_count = DiaryEntry.objects.filter(user=instance.user).count()
-
-        # Пересчитываем каждые 10 записей
-        if user_entries_count >= 10 and user_entries_count % 10 == 0:
-            recalculate_user_correlations(instance.user)
-    except Exception as e:
-        logger.error(f"Ошибка при периодическом пересчете: {str(e)}")
+# УДАЛИТЕ или ЗАКОММЕНТИРУЙТЕ эту функцию - она вызывает рекурсию!
+# @receiver(post_save, sender=DiaryEntry)
+# def recalculate_periodically(sender, instance, **kwargs):
+#     """Периодический пересчет корреляций"""
+#     pass
 
 
 def recalculate_user_correlations(user):

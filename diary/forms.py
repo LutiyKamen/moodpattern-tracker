@@ -26,6 +26,13 @@ class UserRegisterForm(UserCreationForm):
             if field_name not in ['username', 'email']:  # Эти уже настроены
                 self.fields[field_name].widget.attrs.update({'class': 'form-control'})
 
+    def clean_email(self):
+        """Валидация email"""
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError('Этот email уже используется')
+        return email
+
 
 class UserLoginForm(AuthenticationForm):
     """Форма авторизации пользователя"""

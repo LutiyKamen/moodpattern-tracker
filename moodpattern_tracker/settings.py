@@ -6,8 +6,8 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Безопасность
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', os.getenv('SECRET_KEY', 'django-insecure-fallback-key-for-dev'))
+# ВАШ СЕКРЕТНЫЙ КЛЮЧ - ВСТАВЬТЕ СЮДА:
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'p0**y1f=r!+-*$i020kt8r*+&du!j&mn8l*zx_p-9v8-u_2exw')
 
 # Режим отладки
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
