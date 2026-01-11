@@ -16,14 +16,6 @@ class DiaryEntry(models.Model):
         ('terrible', 'Ужасное'),
     ]
 
-    MOOD_CHOICES = [
-        ('excellent', 'Отличное'),
-        ('good', 'Хорошее'),
-        ('neutral', 'Нейтральное'),
-        ('bad', 'Плохое'),
-        ('terrible', 'Ужасное'),
-    ]
-
     MOOD_VALUES = {
         'excellent': 10,
         'good': 5,

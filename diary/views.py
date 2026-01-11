@@ -3,11 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.core.paginator import Paginator
-from django.db.models import Avg, Count
+from django.db.models import Avg
 from datetime import datetime, timedelta
-import pandas as pd
-import plotly.express as px
-import plotly.io as pio
 
 from .models import DiaryEntry, MoodCorrelation
 from .forms import DiaryEntryForm, UserRegisterForm, UserLoginForm
@@ -187,19 +184,38 @@ def delete_entry(request, entry_id):
 
 @login_required
 def analytics(request):
-    """Аналитика"""
+    """Аналитика с пагинацией"""
     # Получаем данные
     entries = DiaryEntry.objects.filter(user=request.user)
     all_correlations = MoodCorrelation.objects.filter(user=request.user)
 
-    # Разделяем корреляции
+    # 1. Положительные корреляции с пагинацией
     positive_correlations = all_correlations.filter(
-        correlation_score__gt=0.05
+        correlation_score__gt=0.5
     ).order_by('-correlation_score')
 
+    positive_paginator = Paginator(positive_correlations, 15)  # 15 записей на страницу
+    positive_page_number = request.GET.get('positive_page')
+    positive_page_obj = positive_paginator.get_page(positive_page_number)
+
+    # 2. Отрицательные корреляции с пагинацией
     negative_correlations = all_correlations.filter(
-        correlation_score__lt=-0.05
+        correlation_score__lt=-0.5
     ).order_by('correlation_score')
+
+    negative_paginator = Paginator(negative_correlations, 15)
+    negative_page_number = request.GET.get('negative_page')
+    negative_page_obj = negative_paginator.get_page(negative_page_number)
+
+    # 3. Нейтральные/слабые корреляции (опционально, для полноты)
+    neutral_correlations = all_correlations.filter(
+        correlation_score__gte=-0.5,
+        correlation_score__lte=0.5
+    ).order_by('-occurrence_count')  # Сортировка по частоте упоминаний
+
+    neutral_paginator = Paginator(neutral_correlations, 10)
+    neutral_page_number = request.GET.get('neutral_page')
+    neutral_page_obj = neutral_paginator.get_page(neutral_page_number)
 
     # Создаем графики
     timeline_chart = create_mood_timeline_chart(entries)
@@ -216,18 +232,35 @@ def analytics(request):
     }
 
     context = {
+        # Пагинированные данные
+        'positive_page_obj': positive_page_obj,
+        'negative_page_obj': negative_page_obj,
+        'neutral_page_obj': neutral_page_obj,
+
+        # Общая статистика
         'all_correlations_count': all_correlations.count(),
-        'positive_correlations': positive_correlations,
-        'negative_correlations': negative_correlations,
+        'positive_count': positive_correlations.count(),
+        'negative_count': negative_correlations.count(),
+        'neutral_count': neutral_correlations.count(),
+
+        # Графики
         'timeline_chart': timeline_chart,
         'weekday_chart': weekday_chart,
         'distribution_chart': distribution_chart,
+
+        # Статистика
         'stats': stats,
         'total_entries': entries.count(),
+
+        # Дни недели
         'best_day_name': weekdays_ru.get(stats['best_day'], 'Недостаточно данных')
         if stats['best_day'] is not None else 'Недостаточно данных',
         'worst_day_name': weekdays_ru.get(stats['worst_day'], 'Недостаточно данных')
         if stats['worst_day'] is not None else 'Недостаточно данных',
+
+        # Флаги для отображения разделов
+        'show_neutral': request.GET.get('show_neutral', False),
     }
 
     return render(request, 'diary/analytics.html', context)
+

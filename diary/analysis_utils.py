@@ -88,17 +88,17 @@ def calculate_statistics(user) -> Dict[str, Any]:
     else:
         avg_mood = max_mood = min_mood = 0
 
-    # Статистика корреляций (обновляем пороги для шкалы -10..10)
-    positive_count = correlations.filter(correlation_score__gt=2).count()  # было 0.05
-    negative_count = correlations.filter(correlation_score__lt=-2).count()  # было -0.05
+    # Статистика корреляций
+    positive_count = correlations.filter(correlation_score__gt=2).count()
+    negative_count = correlations.filter(correlation_score__lt=-2).count()
 
     # Сильнейшие триггеры
     strongest_positive = correlations.filter(
-        correlation_score__gt=2  # было 0.05
+        correlation_score__gt=2
     ).order_by('-correlation_score').first()
 
     strongest_negative = correlations.filter(
-        correlation_score__lt=-2  # было -0.05
+        correlation_score__lt=-2
     ).order_by('correlation_score').first()
 
     return {
@@ -110,7 +110,7 @@ def calculate_statistics(user) -> Dict[str, Any]:
         'negative_triggers_count': negative_count,
         'strongest_positive': strongest_positive,
         'strongest_negative': strongest_negative,
-        'entries_per_day': 0,  # Упрощенно
+        'entries_per_day': 0,
         'best_day': None,
         'worst_day': None,
         'best_day_avg': 0,
