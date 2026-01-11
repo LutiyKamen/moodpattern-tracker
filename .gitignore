@@ -20,3 +20,10 @@ env/
 .vscode/
 *.swp
 .DS_Store
+
+*.pyc
+*.sqlite3
+*.db
+.env.local
+mediafiles/
+staticfiles/

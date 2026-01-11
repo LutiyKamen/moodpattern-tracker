@@ -6,11 +6,35 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-dev')
+# Безопасность
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', os.getenv('SECRET_KEY', 'django-insecure-fallback-key-for-dev'))
 
-DEBUG = True
+# Режим отладки
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = []
+# Домены
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+
+# Для Railway автоматически добавляем их домены
+if not DEBUG:
+    ALLOWED_HOSTS.extend([
+        '*.railway.app',
+        '*.up.railway.app',
+        '.railway.app',
+        '.up.railway.app',
+    ])
+
+# CSRF защита
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+]
+
+if not DEBUG:
+    CSRF_TRUSTED_ORIGINS.extend([
+        'https://*.railway.app',
+        'https://*.up.railway.app',
+    ])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -20,10 +44,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'diary.apps.DiaryConfig',
+    'whitenoise.runserver_nostatic',  # Для разработки с WhiteNoise
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # ДОБАВЬТЕ ПЕРВЫМ после SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -52,6 +78,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'moodpattern_tracker.wsgi.application'
 
+# База данных
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -59,12 +86,35 @@ DATABASES = {
     }
 }
 
+# Если есть DATABASE_URL от Railway (PostgreSQL)
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    # Пытаемся использовать PostgreSQL если установлены зависимости
+    try:
+        import dj_database_url
+
+        DATABASES['default'] = dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    except ImportError:
+        # Если dj_database_url не установлен, оставляем SQLite
+        pass
+
+# Автоматическое определение primary key по умолчанию
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Валидаторы паролей
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,
+        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -74,18 +124,46 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
+# Локализация
 LANGUAGE_CODE = 'ru-ru'
 TIME_ZONE = 'Europe/Moscow'
 USE_I18N = True
 USE_TZ = True
 
-
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+# Статические файлы
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 
-MEDIA_URL = 'media/'
+# WhiteNoise настройки
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+WHITENOISE_MANIFEST_STRICT = False  # Для совместимости с Django
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = DEBUG  # Только в режиме отладки
+
+# Медиа файлы
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# Настройки безопасности
+if not DEBUG:
+    # HTTPS редирект (только в продакшене)
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_HSTS_SECONDS = 31536000  # 1 год
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Куки только через HTTPS
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # Дополнительная безопасность
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+else:
+    # В разработке разрешаем HTTP
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
