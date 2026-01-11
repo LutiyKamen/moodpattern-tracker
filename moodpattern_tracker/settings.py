@@ -13,7 +13,11 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'p0**y1f=r!+-*$i020kt8r*+&du!j&mn8l*
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 # Домены
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+ALLOWED_HOSTS = [
+    'moodpattern-tracker-production.up.railway.app',
+    'localhost',
+    '127.0.0.1',
+]
 
 # Для Railway автоматически добавляем их домены
 if not DEBUG:
