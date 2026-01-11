@@ -10,24 +10,49 @@
                 <h4 class="mb-0"><i class="bi bi-box-arrow-in-right me-2"></i>Вход в систему</h4>
             </div>
             <div class="card-body">
-                <form method="post">
+                <!-- Добавьте отображение сообщений -->
+                {% if messages %}
+                <div class="alert alert-info">
+                    {% for message in messages %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Добавьте id к форме для отладки -->
+                <form method="post" id="login-form">
                     {% csrf_token %}
+
+                    <!-- Добавьте отладку формы -->
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <strong>Ошибки в форме:</strong>
+                        <ul>
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                                <li>{{ field.label }}: {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
 
                     {% for field in form %}
                     <div class="mb-3">
                         <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
                         {{ field }}
 
-                        {% if field.errors %}
-                        <div class="alert alert-danger mt-2">
-                            {{ field.errors }}
-                        </div>
+                        {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
                         {% endif %}
                     </div>
                     {% endfor %}
 
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
                             <i class="bi bi-box-arrow-in-right me-2"></i>Войти
                         </button>
                         <a href="{% url 'register' %}" class="btn btn-link text-decoration-none">
@@ -39,4 +64,33 @@
         </div>
     </div>
 </div>
+
+<!-- Добавьте JavaScript для отладки -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('login-form');
+    const submitBtn = document.getElementById('submit-btn');
+
+    // Проверка, что форма существует
+    if (form) {
+        console.log('Форма найдена');
+
+        form.addEventListener('submit', function(e) {
+            console.log('Форма отправляется...');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Загрузка...';
+        });
+
+        // Проверка CSRF токена
+        const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (csrfInput) {
+            console.log('CSRF токен найден:', csrfInput.value.substring(0, 20) + '...');
+        } else {
+            console.error('CSRF токен НЕ найден!');
+        }
+    } else {
+        console.error('Форма НЕ найдена!');
+    }
+});
+</script>
 {% endblock %}
