@@ -7,16 +7,36 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 
-def analyze_text_sentiment(text):
-    """Анализирует тональность текста"""
+def analyze_text_sentiment(text, user_mood_value=None):
+    """Анализирует тональность текста от -10 до 10 с учетом оценки пользователя"""
     try:
-        blob = TextBlob(text)
-        polarity = blob.sentiment.polarity
-        # Коррекция для русского
-        polarity = polarity * 10
-        return max(-10, min(10, polarity))
-    except:
-        return 0
+        # Анализ с помощью русского анализатора
+        russian_score = analyze_russian_sentiment(text)
+
+        # Анализ с помощью TextBlob (для английских слов если есть)
+        try:
+            blob = TextBlob(text)
+            english_score = blob.sentiment.polarity * 10  # -10..10
+        except:
+            english_score = 0
+
+        # Комбинируем оценки (вес 80% русскому анализатору, 20% TextBlob)
+        combined_score = russian_score * 0.8 + english_score * 0.2
+
+        # Учитываем оценку пользователя если передана
+        if user_mood_value is not None:
+            # Вес пользовательской оценки 30%, анализа текста 70%
+            combined_score = combined_score * 0.7 + user_mood_value * 0.3
+
+        # Округляем и ограничиваем
+        final_score = max(-10.0, min(10.0, round(combined_score, 1)))
+
+        return final_score
+
+    except Exception as e:
+        print(f"Ошибка анализа настроения: {e}")
+        # Возвращаем оценку пользователя или 0
+        return user_mood_value if user_mood_value is not None else 0
 
 
 def extract_keywords(text):
