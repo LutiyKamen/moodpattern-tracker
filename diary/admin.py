@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.safestring import mark_safe  # ← ИЗМЕНИ ЭТО
 from .models import DiaryEntry, ExtractedKeyword, MoodCorrelation
 
 
@@ -43,15 +43,17 @@ class DiaryEntryAdmin(admin.ModelAdmin):
         }),
         ('Автоматический анализ', {
             'fields': ('mood_score', 'word_count'),
-            'classes': ('collapse',)  # Сворачиваемый блок
+            'classes': ('collapse',)
         }),
     )
 
     def short_text_preview(self, obj):
         """Короткий превью текста записи"""
-        if len(obj.text) > 50:
-            return f"{obj.text[:50]}..."
-        return obj.text
+        if obj.text:
+            if len(obj.text) > 50:
+                return f"{obj.text[:50]}..."
+            return obj.text
+        return "(пусто)"
 
     short_text_preview.short_description = 'Текст (превью)'
 
@@ -60,23 +62,23 @@ class DiaryEntryAdmin(admin.ModelAdmin):
         if obj.mood_score is None:
             return "Не анализировано"
 
-        # Определяем цвет в зависимости от оценки
-        if obj.mood_score > 0.3:
+        # Пороги для шкалы -10..10
+        if obj.mood_score > 3:
             color = 'green'
             emoji = '😊'
         elif obj.mood_score > 0:
             color = 'lightgreen'
             emoji = '🙂'
-        elif obj.mood_score > -0.3:
+        elif obj.mood_score > -3:
             color = 'orange'
             emoji = '😐'
         else:
             color = 'red'
             emoji = '😔'
 
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{} {:.2f}</span>',
-            color, emoji, obj.mood_score
+        # Для цветного текста используем mark_safe
+        return mark_safe(
+            f'<span style="color: {color}; font-weight: bold;">{emoji} {obj.mood_score:.1f}</span>'
         )
 
     mood_score_display.short_description = 'Оценка настроения'
@@ -138,6 +140,9 @@ class MoodCorrelationAdmin(admin.ModelAdmin):
 
     def correlation_score_display(self, obj):
         """Цветное отображение коэффициента корреляции"""
+        if obj.correlation_score is None:
+            return "Нет данных"
+
         if obj.correlation_score > 0:
             color = 'green'
             sign = '+'
@@ -148,9 +153,8 @@ class MoodCorrelationAdmin(admin.ModelAdmin):
             color = 'gray'
             sign = ''
 
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{}{:.3f}</span>',
-            color, sign, obj.correlation_score
+        return mark_safe(
+            f'<span style="color: {color}; font-weight: bold;">{sign}{obj.correlation_score:.3f}</span>'
         )
 
     correlation_score_display.short_description = 'Коэффициент корреляции'

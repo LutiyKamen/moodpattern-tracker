@@ -1,8 +1,5 @@
 import re
 import os
-from collections import defaultdict
-import math
-
 
 class AdvancedRussianSentimentAnalyzer:
     """Продвинутый анализатор тональности для русского текста"""

@@ -1,13 +1,14 @@
 from django.db.models import Count, Avg, Max, Min
 from textblob import TextBlob
 import re
-from collections import Counter
+from .russian_sentiment import analyze_russian_sentiment
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
+from typing import Dict, List, Optional, Any
 
 
-def analyze_text_sentiment(text, user_mood_value=None):
+def analyze_text_sentiment(text: str, user_mood_value: Optional[float] = None) -> float:
     """Анализирует тональность текста от -10 до 10 с учетом оценки пользователя"""
     try:
         # Анализ с помощью русского анализатора
@@ -17,7 +18,7 @@ def analyze_text_sentiment(text, user_mood_value=None):
         try:
             blob = TextBlob(text)
             english_score = blob.sentiment.polarity * 10  # -10..10
-        except:
+        except Exception:
             english_score = 0
 
         # Комбинируем оценки (вес 80% русскому анализатору, 20% TextBlob)
@@ -39,7 +40,7 @@ def analyze_text_sentiment(text, user_mood_value=None):
         return user_mood_value if user_mood_value is not None else 0
 
 
-def extract_keywords(text):
+def extract_keywords(text: str) -> List[str]:
     """Извлекает ключевые слова из текста"""
     # Русские стоп-слова
     stop_words = {
@@ -63,7 +64,7 @@ def extract_keywords(text):
     return filtered
 
 
-def calculate_statistics(user):
+def calculate_statistics(user) -> Dict[str, Any]:
     """Рассчитывает статистику пользователя"""
     from diary.models import DiaryEntry, MoodCorrelation
 
@@ -87,17 +88,17 @@ def calculate_statistics(user):
     else:
         avg_mood = max_mood = min_mood = 0
 
-    # Статистика корреляций
-    positive_count = correlations.filter(correlation_score__gt=0.05).count()
-    negative_count = correlations.filter(correlation_score__lt=-0.05).count()
+    # Статистика корреляций (обновляем пороги для шкалы -10..10)
+    positive_count = correlations.filter(correlation_score__gt=2).count()  # было 0.05
+    negative_count = correlations.filter(correlation_score__lt=-2).count()  # было -0.05
 
     # Сильнейшие триггеры
     strongest_positive = correlations.filter(
-        correlation_score__gt=0.05
+        correlation_score__gt=2  # было 0.05
     ).order_by('-correlation_score').first()
 
     strongest_negative = correlations.filter(
-        correlation_score__lt=-0.05
+        correlation_score__lt=-2  # было -0.05
     ).order_by('correlation_score').first()
 
     return {
@@ -117,7 +118,7 @@ def calculate_statistics(user):
     }
 
 
-def create_mood_timeline_chart(entries):
+def create_mood_timeline_chart(entries) -> Optional[str]:
     """График изменения настроения"""
     if entries.count() < 2:
         return None
@@ -165,12 +166,12 @@ def create_mood_timeline_chart(entries):
     return pio.to_html(fig, full_html=False, config={'displayModeBar': False})
 
 
-def create_weekday_chart(entries):
+def create_weekday_chart(entries) -> Optional[str]:
     """График по дням недели"""
     if entries.count() < 5:
         return None
 
-    weekdays_ru = {
+    weekdays_ru: Dict[int, str] = {
         0: 'Пн', 1: 'Вт', 2: 'Ср', 3: 'Чт',
         4: 'Пт', 5: 'Сб', 6: 'Вс'
     }
@@ -229,7 +230,7 @@ def create_weekday_chart(entries):
     return pio.to_html(fig, full_html=False, config={'displayModeBar': False})
 
 
-def create_mood_distribution_chart(entries):
+def create_mood_distribution_chart(entries) -> Optional[str]:
     """Распределение настроений"""
     if entries.count() < 3:
         return None
@@ -241,7 +242,7 @@ def create_mood_distribution_chart(entries):
     if not mood_counts:
         return None
 
-    mood_names = {
+    mood_names: Dict[str, str] = {
         'excellent': 'Отличное',
         'good': 'Хорошее',
         'neutral': 'Нейтральное',
@@ -258,7 +259,7 @@ def create_mood_distribution_chart(entries):
 
     df = pd.DataFrame(data)
 
-    color_map = {
+    color_map: Dict[str, str] = {
         'Отличное': '#a8b8a5',
         'Хорошее': '#b8c9b5',
         'Нейтральное': '#d4c9be',
