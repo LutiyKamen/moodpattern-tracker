@@ -90,13 +90,13 @@
                             </div>
                             <div class="text-end">
                                 <span class="badge bg-success rounded-pill px-3 py-2">
-                                    +{{ correlation.correlation_score|floatformat:3 }}
+                                    +{{ correlation.correlation_score|floatformat:1 }}
                                 </span>
                                 <div class="mt-1">
                                     <small class="text-muted">
-                                        {% if correlation.correlation_score > 0.5 %}
+                                        {% if correlation.correlation_score > 5 %}
                                             Сильная позитивная связь
-                                        {% elif correlation.correlation_score > 0.3 %}
+                                        {% elif correlation.correlation_score > 2 %}
                                             Позитивная связь
                                         {% else %}
                                             Слабая позитивная связь
@@ -146,13 +146,13 @@
                             </div>
                             <div class="text-end">
                                 <span class="badge bg-danger rounded-pill px-3 py-2">
-                                    {{ correlation.correlation_score|floatformat:3 }}
+                                    {{ correlation.correlation_score|floatformat:1 }}
                                 </span>
                                 <div class="mt-1">
                                     <small class="text-muted">
-                                        {% if correlation.correlation_score < -0.5 %}
+                                        {% if correlation.correlation_score < -5 %}
                                             Сильная негативная связь
-                                        {% elif correlation.correlation_score < -0.3 %}
+                                        {% elif correlation.correlation_score < -2 %}
                                             Негативная связь
                                         {% else %}
                                             Слабая негативная связь

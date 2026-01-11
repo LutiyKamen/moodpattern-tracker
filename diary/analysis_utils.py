@@ -13,8 +13,8 @@ def analyze_text_sentiment(text):
         blob = TextBlob(text)
         polarity = blob.sentiment.polarity
         # Коррекция для русского
-        polarity = polarity * 1.2
-        return max(-1.0, min(1.0, polarity))
+        polarity = polarity * 10
+        return max(-10, min(10, polarity))
     except:
         return 0
 
@@ -124,7 +124,7 @@ def create_mood_timeline_chart(entries):
         mode='lines+markers',
         line=dict(color='#6c7b7d', width=2),
         marker=dict(size=6, color=df['mood_score'],
-                    colorscale='RdYlGn', cmin=-1, cmax=1),
+                    colorscale='RdYlGn', cmin=-10, cmax=10),
         hovertemplate='%{x|%d.%m.%Y %H:%M}<br>Настроение: %{y:.2f}<extra></extra>'
     ))
 
@@ -139,7 +139,7 @@ def create_mood_timeline_chart(entries):
         showlegend=False,
         xaxis_title="Дата",
         yaxis_title="Настроение",
-        yaxis_range=[-1.1, 1.1]
+        yaxis_range=[-10, 10]
     )
 
     return pio.to_html(fig, full_html=False, config={'displayModeBar': False})
@@ -175,11 +175,11 @@ def create_weekday_chart(entries):
     # Цвета
     colors = []
     for val in mood_by_day['mood_score']:
-        if val > 0.3:
+        if val > 3:
             colors.append('#a8b8a5')
         elif val > 0:
             colors.append('#b8c9b5')
-        elif val > -0.3:
+        elif val > -3:
             colors.append('#d4c9be')
         else:
             colors.append('#8b6b4f')
@@ -203,7 +203,7 @@ def create_weekday_chart(entries):
         showlegend=False,
         xaxis_title="День недели",
         yaxis_title="Среднее настроение",
-        yaxis_range=[-1.1, 1.1]
+        yaxis_range=[-10, 10]
     )
 
     return pio.to_html(fig, full_html=False, config={'displayModeBar': False})

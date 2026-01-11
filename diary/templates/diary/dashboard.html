@@ -119,7 +119,7 @@
                                     {% if entry.mood_score is not None %}
                                     <small class="ms-2">
                                         (<span class="{% if entry.mood_score > 0.3 %}mood-positive{% elif entry.mood_score < -0.3 %}mood-negative{% else %}text-muted{% endif %}">
-                                            {{ entry.mood_score|floatformat:2 }}
+                                            {{ entry.mood_score|floatformat:1 }}
                                         </span>)
                                     </small>
                                     {% endif %}

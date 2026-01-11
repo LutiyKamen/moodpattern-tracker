@@ -16,6 +16,22 @@ class DiaryEntry(models.Model):
         ('terrible', 'Ужасное'),
     ]
 
+    MOOD_CHOICES = [
+        ('excellent', 'Отличное'),
+        ('good', 'Хорошее'),
+        ('neutral', 'Нейтральное'),
+        ('bad', 'Плохое'),
+        ('terrible', 'Ужасное'),
+    ]
+
+    MOOD_VALUES = {
+        'excellent': 10,
+        'good': 5,
+        'neutral': 0,
+        'bad': -5,
+        'terrible': -10,
+    }
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -33,15 +49,21 @@ class DiaryEntry(models.Model):
     mood_score = models.FloatField(
         null=True,
         blank=True,
-        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
+        validators=[MinValueValidator(-10.0), MaxValueValidator(10.0)],
         verbose_name='Оценка настроения (авто)',
-        help_text='От -1 (очень негативное) до 1 (очень позитивное)'
+        help_text='От -10 (очень негативное) до 10 (очень позитивное)'
     )
     user_mood_tag = models.CharField(
         max_length=20,
         choices=MOOD_CHOICES,
         default='neutral',
         verbose_name='Метка настроения'
+    )
+    # Новое поле для числовой оценки пользователя
+    user_mood_value = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Оценка пользователя'
     )
 
     # Автоматически рассчитываемые поля (для аналитики)
@@ -58,8 +80,18 @@ class DiaryEntry(models.Model):
             models.Index(fields=['user', 'date_created']),
         ]
 
+    def save(self, *args, **kwargs):
+        """Автоматически устанавливаем числовое значение настроения"""
+        if self.user_mood_tag and not self.user_mood_value:
+            self.user_mood_value = self.MOOD_VALUES.get(self.user_mood_tag, 0)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.user.username} - {self.date_created.strftime('%d.%m.%Y')} - {self.get_user_mood_tag_display()}"
+
+    def get_user_mood_numeric(self):
+        """Возвращает числовое значение настроения пользователя"""
+        return self.MOOD_VALUES.get(self.user_mood_tag, 0)
 
 
 class ExtractedKeyword(models.Model):
@@ -115,9 +147,9 @@ class MoodCorrelation(models.Model):
         verbose_name='Ключевое слово'
     )
     correlation_score = models.FloatField(
-        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
+        validators=[MinValueValidator(-10), MaxValueValidator(10)],
         verbose_name='Коэффициент корреляции',
-        help_text='-1: сильная негативная, 0: нет связи, 1: сильная позитивная'
+        help_text='-10: сильная негативная, 0: нет связи, 10: сильная позитивная'
     )
     occurrence_count = models.IntegerField(
         default=0,

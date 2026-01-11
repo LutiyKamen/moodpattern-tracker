@@ -131,7 +131,7 @@ def update_mood_correlation(user, keyword, mood_score, occurrence_increment=1):
             # Обновляем существующую корреляцию
             total_occurrences = correlation.occurrence_count + occurrence_increment
 
-            # Взвешенное обновление
+            # Взвешенное обновление (шкала -10..10)
             old_weight = correlation.occurrence_count / total_occurrences
             new_weight = occurrence_increment / total_occurrences
 
@@ -140,8 +140,8 @@ def update_mood_correlation(user, keyword, mood_score, occurrence_increment=1):
                     mood_score * new_weight
             )
 
-            # Ограничиваем диапазон
-            new_correlation = max(-1.0, min(1.0, new_correlation))
+            # Ограничиваем диапазон -10..10
+            new_correlation = max(-10.0, min(10.0, new_correlation))
 
             correlation.correlation_score = new_correlation
             correlation.occurrence_count = total_occurrences
