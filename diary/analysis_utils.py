@@ -209,7 +209,7 @@ def create_weekday_chart(entries) -> Optional[str]:
         go.Bar(
             x=mood_by_day['weekday_name'],
             y=mood_by_day['mood_score'],
-            marker_color=colors,
+            marker=dict(color=colors),
             text=[f'{val:.2f}' for val in mood_by_day['mood_score']],
             textposition='outside',
         )
@@ -273,7 +273,7 @@ def create_mood_distribution_chart(entries) -> Optional[str]:
         go.Bar(
             x=df['mood'],
             y=df['count'],
-            marker_color=colors,
+            marker=dict(color=colors),
             text=df['count'],
             textposition='auto',
         )

@@ -1,6 +1,5 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from django.contrib.auth.models import User
 from .models import DiaryEntry, ExtractedKeyword, MoodCorrelation
 from .analysis_utils import analyze_text_sentiment, extract_keywords
 import re
@@ -79,7 +78,7 @@ def extract_meaningful_words(text):
 
 
 @receiver(post_save, sender=DiaryEntry)
-def analyze_diary_entry_on_save(sender, instance, created, **kwargs):
+def analyze_diary_entry_on_save(instance):
     """Анализирует дневниковую запись при сохранении"""
     try:
         # Анализируем тональность
@@ -152,24 +151,15 @@ def update_mood_correlation(user, keyword, mood_score, occurrence_increment=1):
 
 
 @receiver(post_delete, sender=DiaryEntry)
-def handle_entry_deletion(sender, instance, **kwargs):
+def handle_entry_deletion(instance):
     """Обрабатывает удаление записи"""
     try:
         logger.info(f"Запись {instance.id} удалена пользователем {instance.user.username}")
     except Exception as e:
         logger.error(f"Ошибка при обработке удаления записи: {str(e)}")
 
-
-# УДАЛИТЕ или ЗАКОММЕНТИРУЙТЕ эту функцию - она вызывает рекурсию!
-# @receiver(post_save, sender=DiaryEntry)
-# def recalculate_periodically(sender, instance, **kwargs):
-#     """Периодический пересчет корреляций"""
-#     pass
-
-
 def recalculate_user_correlations(user):
     """Полный пересчет корреляций для пользователя"""
-    from django.db.models import Avg
 
     try:
         # Удаляем старые корреляции

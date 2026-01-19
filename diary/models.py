@@ -85,6 +85,9 @@ class DiaryEntry(models.Model):
         """Возвращает числовое значение настроения пользователя"""
         return self.MOOD_VALUES.get(self.user_mood_tag, 0)
 
+    def get_user_mood_tag_display(self):
+        pass
+
 
 class ExtractedKeyword(models.Model):
     """Модель для ключевых слов/тем, извлеченных из записей"""
@@ -121,6 +124,9 @@ class ExtractedKeyword(models.Model):
 
     def __str__(self):
         return f"{self.word} ({self.get_category_display()})"
+
+    def get_category_display(self):
+        pass
 
 
 class MoodCorrelation(models.Model):
