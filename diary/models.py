@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
+from .analysis_utils import analyze_text_sentiment, extract_keywords
+from collections import Counter
 
 
 class DiaryEntry(models.Model):
@@ -72,11 +74,101 @@ class DiaryEntry(models.Model):
             models.Index(fields=['user', 'date_created']),
         ]
 
+    def _update_correlation(self, word, mood_score, occurrence_increment=1):
+        """Обновляет корреляцию для одного слова"""
+
+        category = self._get_category_for_word(word)
+
+        keyword, _ = ExtractedKeyword.objects.get_or_create(
+            word=word,
+            defaults={'category': category}
+        )
+
+        correlation, created = MoodCorrelation.objects.get_or_create(
+            user=self.user,
+            keyword=keyword,
+            defaults={
+                'correlation_score': mood_score,
+                'occurrence_count': occurrence_increment
+            }
+        )
+
+        if not created:
+            total_occurrences = correlation.occurrence_count + occurrence_increment
+            old_weight = correlation.occurrence_count / total_occurrences
+            new_weight = occurrence_increment / total_occurrences
+
+            new_correlation = (
+                    correlation.correlation_score * old_weight +
+                    mood_score * new_weight
+            )
+
+            # Ограничение -10..10
+            new_correlation = max(-10.0, min(10.0, new_correlation))
+
+            correlation.correlation_score = new_correlation
+            correlation.occurrence_count = total_occurrences
+            correlation.save()
+
+    @staticmethod
+    def _get_category_for_word(word):
+        """Определяет категорию слова"""
+        CATEGORY_KEYWORDS = {
+            'work': ['работа', 'проект', 'задача', 'дедлайн'],
+            'study': ['учеба', 'университет', 'экзамен', 'зачет'],
+            'family': ['семья', 'родители', 'мама', 'папа'],
+            'friends': ['друзья', 'друг', 'подруга', 'встреча'],
+            'health': ['здоровье', 'болезнь', 'врач', 'боль'],
+            'hobby': ['хобби', 'спорт', 'музыка', 'кино'],
+            'finance': ['деньги', 'зарплата', 'покупка', 'траты'],
+            'rest': ['отдых', 'отпуск', 'сон', 'релакс'],
+        }
+
+        for category, keywords in CATEGORY_KEYWORDS.items():
+            if word in keywords:
+                return category
+        return 'other'
+
     def save(self, *args, **kwargs):
-        """Автоматически устанавливаем числовое значение настроения"""
+        """Автоматический анализ при сохранении записи"""
+
+        # 1. Устанавливаем числовое значение настроения
         if self.user_mood_tag and not self.user_mood_value:
             self.user_mood_value = self.MOOD_VALUES.get(self.user_mood_tag, 0)
+
+        # 2. Вычисляем количество слов
+        self.word_count = len(self.text.split()) if self.text else 0
+
+        # 3. Анализируем тональность текста
+        if self.text and len(self.text.strip()) >= 10:
+            try:
+                self.mood_score = analyze_text_sentiment(
+                    self.text,
+                    self.user_mood_value
+                )
+            except Exception:
+                self.mood_score = None
+
+        # Сохраняем запись
         super().save(*args, **kwargs)
+
+        # 4. Извлекаем ключевые слова и обновляем корреляции (после сохранения)
+        if self.text and self.mood_score is not None:
+            try:
+                keywords = extract_keywords(self.text)
+                word_counts = Counter(keywords)
+
+                for word, count in word_counts.items():
+                    if count >= 1:
+                        # Используем существующую функцию из signals.py
+                        # Или создаем новую в models.py
+                        self._update_correlation(word, self.mood_score, count)
+
+            except Exception as e:
+                # Логируем ошибку, но не прерываем сохранение
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Ошибка при анализе ключевых слов: {e}")
 
     def __str__(self):
         return f"{self.user.username} - {self.date_created.strftime('%d.%m.%Y')} - {self.get_user_mood_tag_display()}"
