@@ -2,8 +2,6 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
-from .analysis_utils import analyze_text_sentiment, extract_keywords
-from collections import Counter
 
 
 class DiaryEntry(models.Model):
@@ -131,6 +129,8 @@ class DiaryEntry(models.Model):
 
     def save(self, *args, **kwargs):
         """Автоматический анализ при сохранении записи"""
+        from .analysis_utils import analyze_text_sentiment, extract_keywords
+        from collections import Counter
 
         # 1. Устанавливаем числовое значение настроения
         if self.user_mood_tag and not self.user_mood_value:
