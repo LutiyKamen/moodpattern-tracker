@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.core.paginator import Paginator
 from django.db.models import Avg
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from .models import DiaryEntry, MoodCorrelation
 from .forms import DiaryEntryForm, UserRegisterForm, UserLoginForm
@@ -112,7 +112,6 @@ def dashboard(request):
         avg_mood = 0
 
     # Записи за сегодня
-    from datetime import date
     today_entries = entries.filter(date_created__date=date.today()).count()
 
     # Топ-триггеры

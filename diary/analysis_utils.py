@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
 from typing import Dict, List, Optional, Any
+from diary.models import DiaryEntry, MoodCorrelation
 
 
 def analyze_text_sentiment(text: str, user_mood_value: Optional[float] = None) -> float:
@@ -66,7 +67,6 @@ def extract_keywords(text: str) -> List[str]:
 
 def calculate_statistics(user) -> Dict[str, Any]:
     """Рассчитывает статистику пользователя"""
-    from diary.models import DiaryEntry, MoodCorrelation
 
     entries = DiaryEntry.objects.filter(user=user)
     correlations = MoodCorrelation.objects.filter(user=user)
