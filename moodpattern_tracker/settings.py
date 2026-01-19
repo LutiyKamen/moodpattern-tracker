@@ -6,7 +6,7 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = 'False'
 
 ALLOWED_HOSTS = [
     'moodpattern-tracker-production.up.railway.app',
