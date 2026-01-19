@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url
 
 load_dotenv()
 
@@ -75,7 +76,18 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'moodpattern_tracker.wsgi.application'
 
-if os.environ.get('PGHOST'):
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=True
+        )
+    }
+
+elif os.environ.get('PGHOST'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -88,6 +100,7 @@ if os.environ.get('PGHOST'):
         }
     }
 else:
+    # SQLite для локальной разработки
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
